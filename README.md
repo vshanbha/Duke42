@@ -95,26 +95,26 @@ git clone https://github.com/<your-org>/duke42.git
 cd duke42
 ```
 
-**2. Build all modules
+**2. Build all modules**
 ```bash
 mvn clean install
 ```
 
-##3. Run the backend in dev mode
+**3. Run the backend in dev mode**
 
 ```bash
 cd backend
 mvn quarkus:dev
 ```
 
-##4. Run the JavaFX UI
+**4. Run the JavaFX UI**
 
 ```bash
 cd ui
 mvn javafx:run
 ```
 
-##5. Optional: Build native image for ultra-fast startup
+**5. Optional: Build native image for ultra-fast startup**
 
 ```bash
 cd backend
