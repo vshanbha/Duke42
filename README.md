@@ -91,7 +91,7 @@ duke42/
 **1. Clone the repo**
 
 ```bash
-git clone https://github.com/<your-org>/duke42.git
+git clone git@github.com:vshanbha/Duke42.git
 cd duke42
 ```
 
