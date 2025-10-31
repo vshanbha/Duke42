@@ -10,14 +10,12 @@
   <packaging>pom</packaging>
 
   <properties>
-    <maven.compiler.source>17</maven.compiler.source>
-    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
     <quarkus.platform.version>3.15.7</quarkus.platform.version> <!-- or latest 3.x -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javafx.version>17.0.8</javafx.version>
-    <!--
-    <quarkus.resteasy.reactive.version>3.15.7</quarkus.resteasy.reactive.version>
-    -->
+    <javafx.atlantafx.version>2.1.0</javafx.atlantafx.version>
   </properties>
 
   <modules>
