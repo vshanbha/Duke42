@@ -22,6 +22,11 @@
             <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.github.mkpaz</groupId>
+            <artifactId>atlantafx-base</artifactId>
+            <version>${javafx.atlantafx.version}</version> <!-- Use the latest version available -->
+        </dependency>
     </dependencies>
 
     <build>
