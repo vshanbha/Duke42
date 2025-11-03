@@ -68,7 +68,7 @@ Supporting modules:
 
 - Java 21+ (LTS recommended)  
 - Maven 4+  
-- GraalVM 23+ (for native image and polyglot features)  
+- GraalVM 21+ (for native image and polyglot features)  
 - Ollama CLI / local LLM setup (for Edge planet)  
 - Optional: Python environment for polyglot demos  
 
