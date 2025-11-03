@@ -36,7 +36,23 @@
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
+                <executions>
+                    <execution>
+                        <id>default-jlink</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jlink</goal>
+                        </goals>
+                    </execution>
+                </executions>
                 <configuration>
+                    <stripDebug>true</stripDebug>
+                    <compress>2</compress>
+                    <noHeaderFiles>true</noHeaderFiles>
+                    <noManPages>true</noManPages>
+                    <launcher>duke42-ui</launcher>
+                    <jlinkImageName>duke42-ui</jlinkImageName>
+                    <jlinkZipName>duke42-uizip</jlinkZipName>
                     <mainClass>com.example.ui.MainApp</mainClass>
                 </configuration>
             </plugin>
