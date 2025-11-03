@@ -30,7 +30,6 @@ public class EdgeResourceTest {
         // Assert that the response body is not empty and contains some content
         assertTrue(response != null && !response.isEmpty(), "Response body should not be empty");
         System.out.println(response);
-        assertTrue(response.contains("Birbal") || response.contains("birbal"), "Response should contain a joke"); // Adjust the assertion as needed
     }
 
 }

@@ -10,10 +10,13 @@
   <packaging>pom</packaging>
 
   <properties>
-    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.release>21</maven.compiler.release>
     <maven.compiler.target>21</maven.compiler.target>
+    <compiler-plugin.version>3.14.0</compiler-plugin.version>
+    <surefire-plugin.version>3.5.2</surefire-plugin.version>
     <quarkus.platform.version>3.15.7</quarkus.platform.version> <!-- or latest 3.x -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
     <javafx.version>17.0.8</javafx.version>
     <javafx.atlantafx.version>2.1.0</javafx.atlantafx.version>
   </properties>
@@ -22,7 +25,20 @@
     <module>ui</module>
     <module>backend</module>
   </modules>
-
+  <profiles>
+      <profile>
+          <id>native</id>
+          <activation>
+              <property>
+                  <name>native</name>
+              </property>
+          </activation>
+          <properties>
+              <skipITs>false</skipITs>
+              <quarkus.native.enabled>true</quarkus.native.enabled>
+          </properties>
+      </profile>
+  </profiles>
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -35,4 +51,3 @@
     </dependencies>
   </dependencyManagement>
 </project>
-
