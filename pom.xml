@@ -10,13 +10,16 @@
   <packaging>pom</packaging>
 
   <properties>
+    <compiler-plugin.version>3.14.1</compiler-plugin.version>
     <maven.compiler.release>21</maven.compiler.release>
-    <maven.compiler.target>21</maven.compiler.target>
-    <compiler-plugin.version>3.14.0</compiler-plugin.version>
-    <surefire-plugin.version>3.5.2</surefire-plugin.version>
-    <quarkus.platform.version>3.15.7</quarkus.platform.version> <!-- or latest 3.x -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+    <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+    <quarkus.platform.version>3.29.0</quarkus.platform.version>
+    <skipITs>true</skipITs>
+    <surefire-plugin.version>3.5.4</surefire-plugin.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javafx.version>17.0.8</javafx.version>
     <javafx.atlantafx.version>2.1.0</javafx.atlantafx.version>
   </properties>
@@ -42,8 +45,15 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>io.quarkus.platform</groupId>
-        <artifactId>quarkus-bom</artifactId>
+        <groupId>${quarkus.platform.group-id}</groupId>
+        <artifactId>${quarkus.platform.artifact-id}</artifactId>
+        <version>${quarkus.platform.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>${quarkus.platform.group-id}</groupId>
+        <artifactId>quarkus-langchain4j-bom</artifactId>
         <version>${quarkus.platform.version}</version>
         <type>pom</type>
         <scope>import</scope>
