@@ -132,11 +132,14 @@ Participants exploring Duke42 will:
 - Connect Java services into AI workflows
 - Gain a mental map of Java GenAI possibilities for enterprise applications
 
-## 📖 Resources
+## 📚 References
 
-- Workshop slides and diagrams: docs/
-- Example polyglot scripts: resources/polyglot/
-- GitHub gists for each demo snippet
+- [Bank Transaction Dataset for Fraud Detection](https://www.kaggle.com/datasets/valakhorasani/bank-transaction-dataset-for-fraud-detection/data)
+- [Quarkus Langchain4j extension](https://docs.quarkiverse.io/quarkus-langchain4j/dev/)
+- [Langchain4j](https://docs.langchain4j.dev/)
+- [Smollm2 models](https://ollama.com/library/smollm2)
+- [Qwen3 models](https://ollama.com/library/qwen3)
+- [Baeldung](https://www.baeldung.com/langchain4j-quarkus-mcp)
 
 ## 💡 Contributing
 
@@ -149,4 +152,3 @@ Fork, code, and submit pull requests—we’ll navigate the galaxy together!
 
 ## 🪐 License
 MIT License – explore, adapt, and share freely!
-
