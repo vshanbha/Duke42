@@ -1,32 +1,47 @@
 package com.example.ui;
 
+import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import atlantafx.base.theme.PrimerDark;
 import javafx.application.Application;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 public class MainApp extends Application {
 
-    private HttpClient httpClient;
-
     @Override
     public void start(Stage stage) {
         // 2. Apply the theme before you create any scenes
         Application.setUserAgentStylesheet(new PrimerDark().getUserAgentStylesheet());
+        HttpClient httpClient = HttpClient.newHttpClient();
+        TabPane tabPane = new TabPane();
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        VBox.setVgrow(tabPane, Priority.ALWAYS);
+        Tab inferTab = new Tab("Infer");
         TextArea prompt = new TextArea("Say hello to Duke!");
         prompt.setPrefRowCount(4);
-        Button infer = new Button("Infer (Edge)");
+        Button infer = new Button();
         TextArea output = new TextArea();
         output.setEditable(false);
 
@@ -35,23 +50,22 @@ public class MainApp extends Application {
             output.setText("Thinking...");
             infer.setDisable(true);
 
-            // Run the network call on a background thread to keep the UI responsive
             Task<String> inferTask = new Task<>() {
                 @Override
                 protected String call() throws Exception {
-                    if (httpClient == null) { httpClient = HttpClient.newHttpClient(); }
-
                     HttpRequest req = HttpRequest.newBuilder()
                             .uri(URI.create("http://localhost:8080/edge/infer"))
                             .POST(HttpRequest.BodyPublishers.ofString(p))
                             .header("Content-Type", "text/plain")
                             .build();
-
-                    return httpClient.send(req, HttpResponse.BodyHandlers.ofString()).body();
+                    try {
+                        return httpClient.send(req, HttpResponse.BodyHandlers.ofString()).body();
+                    } catch (IOException | InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
                 }
             };
 
-            // When the task is done, update the UI on the JavaFX Application Thread
             inferTask.setOnSucceeded(event -> {
                 output.setText(inferTask.getValue());
                 infer.setDisable(false);
@@ -64,21 +78,99 @@ public class MainApp extends Application {
             new Thread(inferTask).start();
         });
 
-        VBox root = new VBox(20, new Label("\uD83D\uDE80 Duke42 — Edge"), prompt, infer, new Label("Output"), output);
-        root.setPrefSize(600, 400);
+        HBox inferInputRow = new HBox(10, prompt, infer);
+        HBox.setHgrow(prompt, Priority.ALWAYS);
+        inferInputRow.setAlignment(Pos.CENTER);
+
+        infer.setGraphic(new FontIcon("far-paper-plane"));
+        VBox inferLayout = new VBox(20, new Label("Output"), output, inferInputRow);
+        VBox.setVgrow(output, Priority.ALWAYS);
+        inferTab.setContent(inferLayout);
+
+        Tab chatTab = new Tab("Chat");
+        TextArea chatInput = new TextArea("Hello, Duke!");
+        chatInput.setPrefRowCount(1);
+        TextArea chatOutput = new TextArea();
+        Button chatSend = new Button();
+        chatSend.setGraphic(new FontIcon("far-paper-plane"));
+
+        chatSend.setOnAction(e -> {
+            String message = chatInput.getText();
+            chatOutput.setText("Thinking...");
+            chatSend.setDisable(true);
+
+            Task<String> chatTask = new Task<>() {
+                @Override
+                protected String call() throws Exception {
+                    String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
+                    HttpRequest req = HttpRequest.newBuilder()
+                            .uri(URI.create(
+                                    "http://localhost:8080/edge/chat/" + "fixme" + "?message=" + encodedMessage))
+                            .POST(HttpRequest.BodyPublishers.noBody())
+                            .header("Content-Type", "text/plain")
+                            .build();
+                    try {
+                        return httpClient.send(req, HttpResponse.BodyHandlers.ofString()).body();
+                    } catch (IOException | InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+
+            chatTask.setOnSucceeded(event -> {
+                chatOutput.setText(chatTask.getValue());
+                chatSend.setDisable(false);
+            });
+            chatTask.setOnFailed(event -> {
+                chatOutput.setText("Error: " + chatTask.getException().getMessage());
+                chatSend.setDisable(false);
+            });
+            new Thread(chatTask).start();
+        });
+
+        chatOutput.setEditable(false);
+        chatTab.setContent(new VBox());
+        HBox chatInputRow = new HBox(10, chatInput, chatSend);
+        chatInputRow.setAlignment(Pos.CENTER);
+        HBox.setHgrow(chatInput, Priority.ALWAYS);
+        Label chatOutputLabel = new Label("Chat Output");
+        VBox.setVgrow(chatOutput, Priority.ALWAYS);
+        VBox chatLayout = new VBox(20, chatOutputLabel, chatOutput, chatInputRow);
+
+        // Implement Shift+Enter for new line and Enter for submission
+        chatInput.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                if (event.isShiftDown()) {
+                    chatInput.insertText(chatInput.getCaretPosition(), System.lineSeparator());
+                } else {
+                    chatSend.fire();
+                }
+                event.consume();
+            }
+        });
+
+        prompt.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                if (event.isShiftDown()) {
+                    prompt.insertText(prompt.getCaretPosition(), System.lineSeparator());
+                } else {
+                    infer.fire();
+                }
+                event.consume();
+            }
+        });
+
+        chatTab.setContent(chatLayout);
+
+        tabPane.getTabs().addAll(inferTab, chatTab);
+
+        VBox root = new VBox(20, new Label("Duke42 — Edge"), tabPane);
+        root.setPrefSize(800, 600);
+
         root.setPadding(new Insets(20));
         stage.setScene(new Scene(root));
         stage.setTitle("\uD83D\uDE80 Duke42 — Pilot UI");
         stage.show();
-    }
-
-    @Override
-    public void stop() {
-        // Gracefully shut down the HttpClient's executor
-        if (httpClient != null) {
-            httpClient.close();
-            System.out.println("[INFO] HttpClient closed.");
-        }
     }
 
     public static void main(String[] args) {

@@ -22,6 +22,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javafx.version>17.0.8</javafx.version>
     <javafx.atlantafx.version>2.1.0</javafx.atlantafx.version>
+    <javafx.ikonli.version>12.4.0</javafx.ikonli.version>
   </properties>
 
   <modules>
