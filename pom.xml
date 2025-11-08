@@ -28,6 +28,7 @@
   <modules>
     <module>ui</module>
     <module>backend</module>
+    <module>polygot</module>
   </modules>
   <profiles>
       <profile>
