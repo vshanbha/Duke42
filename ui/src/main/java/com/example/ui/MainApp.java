@@ -7,6 +7,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 import org.kordamp.ikonli.javafx.FontIcon;
 
@@ -18,6 +19,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
@@ -29,6 +31,8 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 public class MainApp extends Application {
+
+    private final String chatId = UUID.randomUUID().toString();
 
     @Override
     public void start(Stage stage) {
@@ -44,7 +48,7 @@ public class MainApp extends Application {
         Button infer = new Button();
         TextArea output = new TextArea();
         output.setEditable(false);
-
+    
         infer.setOnAction(e -> {
             String p = prompt.getText(); // Grab the prompt text from the UI thread
             output.setText("Thinking...");
@@ -68,6 +72,7 @@ public class MainApp extends Application {
 
             inferTask.setOnSucceeded(event -> {
                 output.setText(inferTask.getValue());
+                prompt.clear();
                 infer.setDisable(false);
             });
             inferTask.setOnFailed(event -> {
@@ -90,13 +95,20 @@ public class MainApp extends Application {
         Tab chatTab = new Tab("Chat");
         TextArea chatInput = new TextArea("Hello, Duke!");
         chatInput.setPrefRowCount(1);
-        TextArea chatOutput = new TextArea();
+        VBox chatOutput = new VBox();
+        VBox.setVgrow(chatOutput, Priority.ALWAYS);
         Button chatSend = new Button();
-        chatSend.setGraphic(new FontIcon("far-paper-plane"));
+        ScrollPane scrollPane = new ScrollPane(chatOutput);
+            scrollPane.setFitToWidth(true);
+        scrollPane.setVvalue(1.0);
+        scrollPane.setPrefHeight(400);
+
 
         chatSend.setOnAction(e -> {
             String message = chatInput.getText();
-            chatOutput.setText("Thinking...");
+            Label thinkingLabel = new Label("Thinking...");
+            chatOutput.getChildren().add(thinkingLabel);
+            scrollPane.setVvalue(1.0);
             chatSend.setDisable(true);
 
             Task<String> chatTask = new Task<>() {
@@ -105,7 +117,7 @@ public class MainApp extends Application {
                     String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
                     HttpRequest req = HttpRequest.newBuilder()
                             .uri(URI.create(
-                                    "http://localhost:8080/edge/chat/" + "fixme" + "?message=" + encodedMessage))
+                                    "http://localhost:8080/edge/chat/" + chatId + "?message=" + encodedMessage))
                             .POST(HttpRequest.BodyPublishers.noBody())
                             .header("Content-Type", "text/plain")
                             .build();
@@ -118,24 +130,34 @@ public class MainApp extends Application {
             };
 
             chatTask.setOnSucceeded(event -> {
-                chatOutput.setText(chatTask.getValue());
+                chatOutput.getChildren().remove(thinkingLabel);
+                Label humanMessage = new Label("You: " + message);
+                Label aiMessage = new Label("AI: " + chatTask.getValue());
+                humanMessage.setWrapText(true);
+                aiMessage.setWrapText(true);
+
+                chatOutput.getChildren().addAll(humanMessage, aiMessage);
+                chatInput.clear();
                 chatSend.setDisable(false);
+                scrollPane.setVvalue(1.0); // Scroll to the bottom after adding a new message
             });
+
             chatTask.setOnFailed(event -> {
-                chatOutput.setText("Error: " + chatTask.getException().getMessage());
+                Label errorMessage = new Label("Error: " + chatTask.getException().getMessage());
+                chatOutput.getChildren().add(errorMessage);
+                errorMessage.setWrapText(true);
                 chatSend.setDisable(false);
             });
             new Thread(chatTask).start();
         });
 
-        chatOutput.setEditable(false);
         chatTab.setContent(new VBox());
         HBox chatInputRow = new HBox(10, chatInput, chatSend);
         chatInputRow.setAlignment(Pos.CENTER);
+        chatSend.setGraphic(new FontIcon("far-paper-plane"));
         HBox.setHgrow(chatInput, Priority.ALWAYS);
-        Label chatOutputLabel = new Label("Chat Output");
+        VBox chatLayout = new VBox(20, scrollPane, chatInputRow);
         VBox.setVgrow(chatOutput, Priority.ALWAYS);
-        VBox chatLayout = new VBox(20, chatOutputLabel, chatOutput, chatInputRow);
 
         // Implement Shift+Enter for new line and Enter for submission
         chatInput.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
@@ -162,6 +184,17 @@ public class MainApp extends Application {
 
         chatTab.setContent(chatLayout);
 
+        stage.heightProperty().addListener((obs, oldVal, newVal) -> {
+            double availableHeight = newVal.doubleValue() - 200; // Adjust this value based on your layout
+            scrollPane.setPrefHeight(Math.max(400, availableHeight)); // Ensure a minimum height of 400
+            scrollPane.setVvalue(1.0);
+        });
+
+        // Set initial scrollPane height
+        double initialAvailableHeight = 600 - 200; // Initial stage height - top padding and other elements height
+        scrollPane.setPrefHeight(Math.max(400, initialAvailableHeight));
+
+
         tabPane.getTabs().addAll(inferTab, chatTab);
 
         VBox root = new VBox(20, new Label("Duke42 — Edge"), tabPane);
@@ -172,6 +205,7 @@ public class MainApp extends Application {
         stage.setTitle("\uD83D\uDE80 Duke42 — Pilot UI");
         stage.show();
     }
+
 
     public static void main(String[] args) {
         launch();
