@@ -1,6 +1,8 @@
 module ui {
     requires javafx.controls;
     requires javafx.fxml;
+    requires javafx.graphics;
+
     requires atlantafx.base;
     requires java.net.http;
     requires org.kordamp.ikonli.core;
@@ -9,5 +11,4 @@ module ui {
 
     opens com.example.ui to javafx.fxml; // Replace com.example.ui with the package of your FXML controllers
     exports com.example.ui;
-
 }
