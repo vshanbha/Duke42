@@ -56,6 +56,20 @@ To set up and manage a virtual environment for this project, follow these steps:
 
     This command installs all the packages listed in the `requirements.txt` file.
 
+## `setup.py` and Package Installation
+
+This project includes a `setup.py` file to define the project as a package. This provides several benefits for development and testing:
+
+1.  **Dependency Management:**  The `install_requires` section in `setup.py` lists the project's dependencies, making it easier to manage project requirements.
+2.  **Simplified Imports:**  After installing the project as a package, you can use absolute imports within the project.
+3.  **Testability:**  Installing the project makes it easier to run tests and ensure that all modules are correctly discoverable.
+
+To install the project as a package in editable mode, run the following command from the project root directory:
+
+```bash
+pip install -e .
+```
+
 ## Testing
 
 The `tests/` directory contains unit and integration tests to ensure the reliability and correctness of the code.
