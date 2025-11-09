@@ -15,7 +15,7 @@ class SentimentScoringResourceTest {
             .contentType(MediaType.TEXT_PLAIN)
             .body("This is a test sentence for sentiment analysis.")
             .when()
-            .post("/polygot/score")
+            .post("/polyglot/score")
             .then()
                 .statusCode(200)
                 .extract().body().as(String.class);        

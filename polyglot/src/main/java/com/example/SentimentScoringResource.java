@@ -15,7 +15,7 @@ import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
 
-@Path("/polygot")
+@Path("/polyglot")
 public class SentimentScoringResource {
 
     private static final String PYTHON = "python";
