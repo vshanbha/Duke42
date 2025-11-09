@@ -2,3 +2,6 @@ pandas
 scikit-learn
 openpyxl
 xlrd
+pytest
+pytest-ordering
+setuptools

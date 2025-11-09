@@ -1,17 +1,41 @@
 import pandas as pd
 from sklearn.ensemble import IsolationForest
+import os
+import json
 
-def train_isolation_forest(df, contamination='auto'):
-    """
-    Trains an Isolation Forest model on the given data.
-    """
-    model = IsolationForest(contamination=contamination)
-    model.fit(df)
-    return model
+MODEL = None
+CLEAN_TRANSACTIONS_FILE = os.path.join('data', 'processed', 'transactions_clean.csv')
 
-def predict_anomalies(model, df):
+def init_model():
     """
-    Predicts anomalies using the trained Isolation Forest model.
+    Initializes the Isolation Forest model.
     """
-    anomalies = model.predict(df)
-    return anomalies
+    global MODEL
+
+    # Load the cleaned transactions data
+    try:
+        df = pd.read_csv(CLEAN_TRANSACTIONS_FILE)
+    except FileNotFoundError:
+        print(f"Error: {CLEAN_TRANSACTIONS_FILE} not found. Make sure to run data_preprocessing.py first.")
+        return
+
+    # Select numeric columns
+    numeric_cols = df.select_dtypes(include=['number']).columns
+    df_numeric = df[numeric_cols]
+
+    # Train a small Isolation Forest model
+    MODEL = IsolationForest(n_estimators=100, contamination='auto', random_state=42) # Adjust parameters as needed
+    MODEL.fit(df_numeric)
+
+def score(record: dict) -> dict:
+    """
+    Scores a record using the trained Isolation Forest model.
+    """
+    global MODEL
+    if MODEL is None:
+        return {"anomaly_score": 0.0, "root_cause": "Model not initialized"}
+
+    record_df = pd.DataFrame([record])
+    anomaly_score = MODEL.decision_function(record_df) # Lower score indicates more anomalous
+
+    return {"anomaly_score": float(anomaly_score[0]), "root_cause": "Isolation Forest"}

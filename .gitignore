@@ -58,3 +58,4 @@ venv/
 
 #Distribution / packaging
 .Python
+*.egg-info/
