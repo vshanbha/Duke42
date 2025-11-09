@@ -1,4 +1,4 @@
-# polygot
+# polyglot
 
 This is a partially complete project meant to consume a Python model using GraalPy.
 Original Plan was to use this with the model produced by the [AnomalyDetector project](../AnomalyDetector). However, GraalPy builds seem to run into issues with NumPy.
