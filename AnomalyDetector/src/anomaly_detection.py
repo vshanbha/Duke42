@@ -1,7 +1,6 @@
 import pandas as pd
 from sklearn.ensemble import IsolationForest
 import os
-import json
 
 MODEL_FILE = os.path.join('models', 'anomaly_model.joblib')
 MODEL = None
@@ -38,9 +37,12 @@ def score(record: dict) -> dict:
     global MODEL
     if MODEL is None:
         return {"anomaly_score": 0.0, "root_cause": "Model not initialized"}
-
-    record_df = pd.DataFrame([record])
-    anomaly_score = MODEL.decision_function(record_df) # Lower score indicates more anomalous
+    
+    # Extract the values from the record dictionary and convert to a list
+    record_values = list(record.values())
+    
+    # Ensure the input is 2D array-like
+    anomaly_score = MODEL.decision_function([record_values])  # Lower score indicates more anomalous
 
     return {"anomaly_score": float(anomaly_score[0]), "root_cause": "Isolation Forest"}
 

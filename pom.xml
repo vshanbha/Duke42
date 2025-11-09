@@ -23,12 +23,12 @@
     <javafx.version>17.0.8</javafx.version>
     <javafx.atlantafx.version>2.1.0</javafx.atlantafx.version>
     <javafx.ikonli.version>12.4.0</javafx.ikonli.version>
+    <org.graalvm.polyglot.version>25.0.0</org.graalvm.polyglot.version>
   </properties>
 
   <modules>
     <module>ui</module>
     <module>backend</module>
-    <module>polygot</module>
   </modules>
   <profiles>
       <profile>
