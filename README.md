@@ -2,7 +2,7 @@
 
 *Duke42 – your Hitchhiker’s Guide to the Java AI Galaxy*
 
-Welcome aboard! I’m **Duke**, your trusty Java mascot and pilot, here to navigate you through the far reaches of the **Java + GenAI universe**. From running **local LLMs** to **polyglot pipelines** and **AI workflow orchestration**, we’ll explore it all—no towels required… unless you’re feeling particularly intergalactic.
+Welcome aboard! I’m **Duke**, your trusty Java mascot and pilot, here to navigate you through the far reaches of the **Java + GenAI universe**. From running **local LLMs** to **polyglot Java + Python libraries** and **AI workflow orchestration**, we’ll explore it all—no towels required… unless you’re feeling particularly intergalactic.
 
 
                         .       ☆

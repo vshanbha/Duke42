@@ -18,7 +18,8 @@ class SentimentScoringResourceTest {
             .post("/polyglot/score")
             .then()
                 .statusCode(200)
-                .extract().body().as(String.class);        
+                .contentType(MediaType.TEXT_PLAIN)
+                .extract().body().asString();
              
         assertTrue(result.length() > 0, "The result should not be empty");
     }
