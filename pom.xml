@@ -27,8 +27,9 @@
   </properties>
 
   <modules>
-    <module>ui</module>
+    <module>polyglot</module>
     <module>backend</module>
+    <module>ui</module>
   </modules>
   <profiles>
       <profile>

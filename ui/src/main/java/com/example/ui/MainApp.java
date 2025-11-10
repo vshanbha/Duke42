@@ -197,12 +197,12 @@ public class MainApp extends Application {
 
         tabPane.getTabs().addAll(inferTab, chatTab);
 
-        VBox root = new VBox(20, new Label("Duke42 — Edge"), tabPane);
+        VBox root = new VBox(20, tabPane);
         root.setPrefSize(800, 600);
 
         root.setPadding(new Insets(20));
         stage.setScene(new Scene(root));
-        stage.setTitle("\uD83D\uDE80 Duke42 — Pilot UI");
+        stage.setTitle("Duke42 — Pilot UI");
         stage.show();
     }
 

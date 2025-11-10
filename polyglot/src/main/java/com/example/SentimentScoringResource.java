@@ -33,7 +33,7 @@ public class SentimentScoringResource {
         try {
             polyglotContext = GraalPyResources.createContext();
             // Load the Python script from classpath
-            try (Reader reader = new InputStreamReader(AnomalyDetectionResource.class.getClassLoader().getResourceAsStream(pythonScriptPath))) {
+            try (Reader reader = new InputStreamReader(SentimentScoringResource.class.getClassLoader().getResourceAsStream(pythonScriptPath))) {
                 source = Source.newBuilder(PYTHON, reader, pythonScriptPath).build();
             } catch (Exception e) {
                 System.err.println("Error loading Python source script: " + e.getMessage());
@@ -60,7 +60,7 @@ public class SentimentScoringResource {
 
     @POST
     @Path("/score")
-    @Consumes(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.TEXT_PLAIN)
     public Response score(String text) {
         System.err.println("Scoring Function value : " + scoreFunction);
         if (scoreFunction == null || !scoreFunction.canExecute()) {
