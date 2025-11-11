@@ -24,6 +24,8 @@
     <javafx.atlantafx.version>2.1.0</javafx.atlantafx.version>
     <javafx.ikonli.version>12.4.0</javafx.ikonli.version>
     <org.graalvm.polyglot.version>25.0.0</org.graalvm.polyglot.version>
+    <io.quarkiverse.mcp.version>1.7.1</io.quarkiverse.mcp.version>
+    <io.quarkiverse.langchain4j.version>1.0.0</io.quarkiverse.langchain4j.version>
   </properties>
 
   <modules>
