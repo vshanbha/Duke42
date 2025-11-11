@@ -7,15 +7,19 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.enterprise.context.ApplicationScoped;
 import java.io.InputStreamReader;
 import java.io.Reader;
-
+import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.ToolArg;
+import io.quarkus.runtime.Startup;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
 
 @Path("/polyglot")
+@ApplicationScoped
 public class SentimentScoringResource {
 
     private static final String PYTHON = "python";
@@ -26,7 +30,8 @@ public class SentimentScoringResource {
 
     Context polyglotContext;
 
-    @PostConstruct
+//    @PostConstruct
+    @Startup
     void setup() {
         Source source;
 
@@ -61,24 +66,11 @@ public class SentimentScoringResource {
     @POST
     @Path("/score")
     @Consumes(MediaType.TEXT_PLAIN)
-    public Response score(String text) {
-        System.err.println("Scoring Function value : " + scoreFunction);
-        if (scoreFunction == null || !scoreFunction.canExecute()) {
-            System.err.println("Score function is not properly initialized.");
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity("Python function not initialized.")
-                .type(MediaType.TEXT_PLAIN)
-                .build();
-        }
-
+    public Response scoreText(String text) {
         try {
-            // Convert the text data to a Polyglot value
-            Value textValue = polyglotContext.asValue(text);
-            // Call the Python scoring function
-            Value result = scoreFunction.execute(textValue);
-
+            String result = score(text);
             // Convert the result to a Java String
-            return Response.ok(result.asString(), MediaType.TEXT_PLAIN).build();
+            return Response.ok(result, MediaType.TEXT_PLAIN).build();
         } catch (Exception e) {
             System.err.println("Error during scoring: " + e.getMessage());
             e.printStackTrace();
@@ -89,6 +81,22 @@ public class SentimentScoringResource {
         }
     }
 
+
+    @Tool(description="Returns the sentiment score of a given text")
+    public String score(
+    @ToolArg(description = "Text whose sentiment is to be calculated") String text) {
+        System.err.println("Scoring Function value : " + scoreFunction);
+        if (scoreFunction == null || !scoreFunction.canExecute()) {
+            System.err.println("Score function is not properly initialized.");
+            return "Server Not Ready";
+        }
+
+        Value textValue = polyglotContext.asValue(text);
+        // Call the Python scoring function
+        Value result = scoreFunction.execute(textValue);
+        return result.asString();
+    }
+
 	@PreDestroy
 	public void close() {
 		if (polyglotContext != null) {
@@ -96,4 +104,5 @@ public class SentimentScoringResource {
 		}
 	}    
 
+    
 }

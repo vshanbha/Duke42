@@ -11,20 +11,6 @@
     <groupId>com.example</groupId>
     <artifactId>polyglot</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <properties>
-        <compiler-plugin.version>3.14.1</compiler-plugin.version>
-        <maven.compiler.release>21</maven.compiler.release>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-        <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus.platform.version>3.29.0</quarkus.platform.version>
-        <skipITs>true</skipITs>
-        <surefire-plugin.version>3.5.4</surefire-plugin.version>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <org.graalvm.polyglot.version>25.0.0</org.graalvm.polyglot.version>
-    </properties>
-
     <dependencyManagement>
         <dependencies>
         <dependency>
@@ -66,7 +52,12 @@
             <groupId>org.graalvm.python</groupId>
             <artifactId>python-embedding</artifactId> 
             <version>${org.graalvm.polyglot.version}</version>
-        </dependency>    
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.mcp</groupId>
+            <artifactId>quarkus-mcp-server-sse</artifactId>
+            <version>${io.quarkiverse.mcp.version}</version>
+        </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit5</artifactId>
@@ -141,6 +132,7 @@
                 <version>${org.graalvm.polyglot.version}</version>
                 <executions>
                     <execution>
+                        <phase>generate-resources</phase>
                         <configuration>
                             <packages>
                                 <!-- Select Python packages to install via pip. -->

@@ -22,6 +22,8 @@ class SentimentScoringResourceTest {
                 .extract().body().asString();
              
         assertTrue(result.length() > 0, "The result should not be empty");
+        System.out.println("Result: " + result);
+        assertTrue(result.toLowerCase().contains("\"classification\": \"neutral\""), "The result contains a valid sentiment");
     }
 
 }
