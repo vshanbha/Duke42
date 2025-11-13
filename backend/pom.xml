@@ -6,7 +6,7 @@
         <version>0.1.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-    <groupId>org.acme</groupId>
+    <groupId>com.example</groupId>
     <artifactId>backend</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 
@@ -22,6 +22,10 @@
         <dependency>
             <groupId>io.quarkiverse.langchain4j</groupId>
             <artifactId>quarkus-langchain4j-ollama</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-mcp</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
