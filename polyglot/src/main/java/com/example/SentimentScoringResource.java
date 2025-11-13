@@ -30,7 +30,6 @@ public class SentimentScoringResource {
 
     Context polyglotContext;
 
-//    @PostConstruct
     @Startup
     void setup() {
         Source source;
@@ -49,7 +48,6 @@ public class SentimentScoringResource {
 
             polyglotContext.eval(source);
             System.err.println("Python script loaded successfully.");
-//            polyglotContext.eval(PYTHON, "from load_model import load_model_and_score; score_function = load_model_and_score()");
             scoreFunction = polyglotContext.getBindings("python").getMember("analyze_sentiment");
             if (scoreFunction == null || scoreFunction.isNull()) {
                 System.err.println("Failed to load score function from Python script.");

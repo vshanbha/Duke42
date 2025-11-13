@@ -15,6 +15,10 @@ public class EdgeResource {
     @Inject
     EdgeLLMService llm;
 
+    @Inject
+    EdgeToolLLMService toolLlm;
+
+
     @POST
     @Path("/infer")
     @Consumes(MediaType.TEXT_PLAIN)
@@ -36,6 +40,21 @@ public class EdgeResource {
         }
         
         return llm.chat(chatId, message);
+    }
+
+    @POST
+    @Path("/toolChat/{chatId}")
+    @Consumes(MediaType.TEXT_PLAIN)
+    @Produces(MediaType.TEXT_PLAIN)
+    public String toolChat(
+        @PathParam("chatId") String chatId,
+        @QueryParam("message") String message
+    ) {
+        if (chatId == null || chatId.trim().isEmpty()) {
+            return "User ID cannot be empty.";
+        }
+        
+        return toolLlm.chatWithTools(chatId, message);
     }
 
 }

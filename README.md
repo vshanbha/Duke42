@@ -140,6 +140,7 @@ Participants exploring Duke42 will:
 - [Smollm2 models](https://ollama.com/library/smollm2)
 - [Qwen3 models](https://ollama.com/library/qwen3)
 - [Baeldung](https://www.baeldung.com/langchain4j-quarkus-mcp)
+- [Using Multiple models](https://www.the-main-thread.com/p/agentic-java-multi-model-ai-quarkus)
 
 ## 💡 Contributing
 
