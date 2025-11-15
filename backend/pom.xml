@@ -99,6 +99,86 @@
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
+            <!-- Failed attempt to start MCP server before integration tests
+             1. Copy polyglot runner jar to target directory
+             2. Start polyglot runner jar asynchronously
+             3. Wait for port 9000 to be available before running integration tests
+             4. Shut down polyglot runner jar after tests complete
+             5. This approach did not work as expected, so it has been commented out for now.
+             6. Please ensure that the MCP server is running manually before executing integration tests.
+             7. Future improvements may include better process management or using Docker for the MCP server.
+            -->
+            <!--
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-polyglot-runner</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.example</groupId>
+                                    <artifactId>polyglot</artifactId>
+                                    <version>1.0.0-SNAPSHOT</version>
+                                    <classifier>runner</classifier>
+                                    <type>jar</type>
+                                    <destFileName>polyglot-runner.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>start-polyglot</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>java</executable>
+                            <arguments>
+                                <argument>-jar</argument>
+                                <argument>${project.build.directory}/polyglot-runner.jar</argument>
+                            </arguments>
+                            <async>true</async>
+                            <asyncDestroyOnShutdown>true</asyncDestroyOnShutdown>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>wait-for-polyglot-port</id>
+                        <phase>pre-integration-test</phase>
+                        <configuration>
+                            <target>
+                                <waitfor maxwait="60" maxwaitunit="second" checkevery="" checkeveryunit="second">
+                                    <http url="http://localhost:9000"/>
+                                </waitfor>
+                                <echo message="Polyglot MCP server is ready on localhost:9000/mcp/sse"/>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            -->
         </plugins>
     </build>
 
