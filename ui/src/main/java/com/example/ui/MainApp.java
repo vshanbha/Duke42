@@ -8,6 +8,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.kordamp.ikonli.javafx.FontIcon;
 
@@ -36,7 +38,6 @@ public class MainApp extends Application {
 
     @Override
     public void start(Stage stage) {
-        // 2. Apply the theme before you create any scenes
         Application.setUserAgentStylesheet(new PrimerDark().getUserAgentStylesheet());
         HttpClient httpClient = HttpClient.newHttpClient();
         TabPane tabPane = new TabPane();
@@ -92,110 +93,25 @@ public class MainApp extends Application {
         VBox.setVgrow(output, Priority.ALWAYS);
         inferTab.setContent(inferLayout);
 
-        Tab chatTab = new Tab("Chat");
-        TextArea chatInput = new TextArea("Hello, Duke!");
-        chatInput.setPrefRowCount(1);
-        VBox chatOutput = new VBox();
-        VBox.setVgrow(chatOutput, Priority.ALWAYS);
-        Button chatSend = new Button();
-        ScrollPane scrollPane = new ScrollPane(chatOutput);
-            scrollPane.setFitToWidth(true);
-        scrollPane.setVvalue(1.0);
-        scrollPane.setPrefHeight(400);
-
-
-        chatSend.setOnAction(e -> {
-            String message = chatInput.getText();
-            Label thinkingLabel = new Label("Thinking...");
-            chatOutput.getChildren().add(thinkingLabel);
-            scrollPane.setVvalue(1.0);
-            chatSend.setDisable(true);
-
-            Task<String> chatTask = new Task<>() {
-                @Override
-                protected String call() throws Exception {
-                    String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
-                    HttpRequest req = HttpRequest.newBuilder()
-                            .uri(URI.create(
-                                    "http://localhost:8080/edge/chat/" + chatId + "?message=" + encodedMessage))
-                            .POST(HttpRequest.BodyPublishers.noBody())
-                            .header("Content-Type", "text/plain")
-                            .build();
-                    try {
-                        return httpClient.send(req, HttpResponse.BodyHandlers.ofString()).body();
-                    } catch (IOException | InterruptedException ex) {
-                        throw new RuntimeException(ex);
-                    }
-                }
-            };
-
-            chatTask.setOnSucceeded(event -> {
-                chatOutput.getChildren().remove(thinkingLabel);
-                Label humanMessage = new Label("You: " + message);
-                Label aiMessage = new Label("AI: " + chatTask.getValue());
-                humanMessage.setWrapText(true);
-                aiMessage.setWrapText(true);
-
-                chatOutput.getChildren().addAll(humanMessage, aiMessage);
-                chatInput.clear();
-                chatSend.setDisable(false);
-                scrollPane.setVvalue(1.0); // Scroll to the bottom after adding a new message
-            });
-
-            chatTask.setOnFailed(event -> {
-                Label errorMessage = new Label("Error: " + chatTask.getException().getMessage());
-                chatOutput.getChildren().add(errorMessage);
-                errorMessage.setWrapText(true);
-                chatSend.setDisable(false);
-            });
-            new Thread(chatTask).start();
-        });
-
-        chatTab.setContent(new VBox());
-        HBox chatInputRow = new HBox(10, chatInput, chatSend);
-        chatInputRow.setAlignment(Pos.CENTER);
-        chatSend.setGraphic(new FontIcon("far-paper-plane"));
-        HBox.setHgrow(chatInput, Priority.ALWAYS);
-        VBox chatLayout = new VBox(20, scrollPane, chatInputRow);
-        VBox.setVgrow(chatOutput, Priority.ALWAYS);
-
-        // Implement Shift+Enter for new line and Enter for submission
-        chatInput.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() == KeyCode.ENTER) {
-                if (event.isShiftDown()) {
-                    chatInput.insertText(chatInput.getCaretPosition(), System.lineSeparator());
-                } else {
-                    chatSend.fire();
-                }
-                event.consume();
-            }
-        });
-
-        prompt.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() == KeyCode.ENTER) {
-                if (event.isShiftDown()) {
-                    prompt.insertText(prompt.getCaretPosition(), System.lineSeparator());
-                } else {
-                    infer.fire();
-                }
-                event.consume();
-            }
-        });
-
-        chatTab.setContent(chatLayout);
+        List<ScrollPane> chatScrollPanes = new ArrayList<>();
+        Tab chatTab = createChatTab("Chat", "/edge/chat", httpClient, chatScrollPanes);
+        Tab toolChatTab = createChatTab("Tool Chat", "/edge/toolChat", httpClient, chatScrollPanes);
 
         stage.heightProperty().addListener((obs, oldVal, newVal) -> {
             double availableHeight = newVal.doubleValue() - 200; // Adjust this value based on your layout
-            scrollPane.setPrefHeight(Math.max(400, availableHeight)); // Ensure a minimum height of 400
-            scrollPane.setVvalue(1.0);
+            for (ScrollPane sp : chatScrollPanes) {
+                sp.setPrefHeight(Math.max(400, availableHeight));
+                sp.setVvalue(1.0);
+            }
         });
 
         // Set initial scrollPane height
         double initialAvailableHeight = 600 - 200; // Initial stage height - top padding and other elements height
-        scrollPane.setPrefHeight(Math.max(400, initialAvailableHeight));
+        for (ScrollPane sp : chatScrollPanes) {
+            sp.setPrefHeight(Math.max(400, initialAvailableHeight));
+        }
 
-
-        tabPane.getTabs().addAll(inferTab, chatTab);
+        tabPane.getTabs().addAll(inferTab, chatTab, toolChatTab);
 
         VBox root = new VBox(20, tabPane);
         root.setPrefSize(800, 600);
@@ -209,5 +125,87 @@ public class MainApp extends Application {
 
     public static void main(String[] args) {
         launch();
+    }
+
+    private Tab createChatTab(String title, String endpointBase, HttpClient httpClient, List<ScrollPane> scrollPanes) {
+        TextArea input = new TextArea("Hello, Duke!");
+        input.setPrefRowCount(1);
+        VBox output = new VBox();
+        VBox.setVgrow(output, Priority.ALWAYS);
+        Button send = new Button();
+        ScrollPane scrollPane = new ScrollPane(output);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setVvalue(1.0);
+        scrollPane.setPrefHeight(400);
+
+        send.setOnAction(e -> {
+            String message = input.getText();
+            Label thinkingLabel = new Label("Thinking...");
+            output.getChildren().add(thinkingLabel);
+            scrollPane.setVvalue(1.0);
+            send.setDisable(true);
+
+            Task<String> task = new Task<>() {
+                @Override
+                protected String call() throws Exception {
+                    String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
+                    HttpRequest req = HttpRequest.newBuilder()
+                            .uri(URI.create("http://localhost:8080" + endpointBase + "/" + chatId + "?message=" + encodedMessage))
+                            .POST(HttpRequest.BodyPublishers.noBody())
+                            .header("Content-Type", "text/plain")
+                            .build();
+                    try {
+                        return httpClient.send(req, HttpResponse.BodyHandlers.ofString()).body();
+                    } catch (IOException | InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+
+            task.setOnSucceeded(event -> {
+                output.getChildren().remove(thinkingLabel);
+                Label humanMessage = new Label("You: " + message);
+                Label aiMessage = new Label("AI: " + task.getValue());
+                humanMessage.setWrapText(true);
+                aiMessage.setWrapText(true);
+
+                output.getChildren().addAll(humanMessage, aiMessage);
+                input.clear();
+                send.setDisable(false);
+                scrollPane.setVvalue(1.0);
+            });
+
+            task.setOnFailed(event -> {
+                Label errorMessage = new Label("Error: " + task.getException().getMessage());
+                output.getChildren().add(errorMessage);
+                errorMessage.setWrapText(true);
+                send.setDisable(false);
+            });
+            new Thread(task).start();
+        });
+
+        HBox inputRow = new HBox(10, input, send);
+        inputRow.setAlignment(Pos.CENTER);
+        send.setGraphic(new FontIcon("far-paper-plane"));
+        HBox.setHgrow(input, Priority.ALWAYS);
+        VBox layout = new VBox(20, scrollPane, inputRow);
+        VBox.setVgrow(output, Priority.ALWAYS);
+
+        // Implement Shift+Enter for new line and Enter for submission
+        input.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                if (event.isShiftDown()) {
+                    input.insertText(input.getCaretPosition(), System.lineSeparator());
+                } else {
+                    send.fire();
+                }
+                event.consume();
+            }
+        });
+
+        Tab tab = new Tab(title);
+        tab.setContent(layout);
+        scrollPanes.add(scrollPane);
+        return tab;
     }
 }
