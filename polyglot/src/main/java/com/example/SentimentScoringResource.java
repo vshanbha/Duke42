@@ -1,6 +1,5 @@
 package com.example;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
