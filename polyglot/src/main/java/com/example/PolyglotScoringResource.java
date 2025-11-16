@@ -19,11 +19,12 @@ import org.graalvm.python.embedding.GraalPyResources;
 
 @Path("/polyglot")
 @ApplicationScoped
-public class SentimentScoringResource {
+public class PolyglotScoringResource {
 
     private static final String PYTHON = "python";
 
     private static Value scoreFunction;
+    private static Value anomalyFunction;
 
     private final String pythonScriptPath = "load_model.py";
 
@@ -36,7 +37,7 @@ public class SentimentScoringResource {
         try {
             polyglotContext = GraalPyResources.createContext();
             // Load the Python script from classpath
-            try (Reader reader = new InputStreamReader(SentimentScoringResource.class.getClassLoader().getResourceAsStream(pythonScriptPath))) {
+            try (Reader reader = new InputStreamReader(PolyglotScoringResource.class.getClassLoader().getResourceAsStream(pythonScriptPath))) {
                 source = Source.newBuilder(PYTHON, reader, pythonScriptPath).build();
             } catch (Exception e) {
                 System.err.println("Error loading Python source script: " + e.getMessage());
@@ -47,12 +48,19 @@ public class SentimentScoringResource {
 
             polyglotContext.eval(source);
             System.err.println("Python script loaded successfully.");
-            scoreFunction = polyglotContext.getBindings("python").getMember("analyze_sentiment");
+            scoreFunction = polyglotContext.getBindings(PYTHON).getMember("analyze_sentiment");
             if (scoreFunction == null || scoreFunction.isNull()) {
-                System.err.println("Failed to load score function from Python script.");
+                System.err.println("Failed to load analyze_sentiment function from Python script.");
                 return;
             }
-            System.out.println("scoreFunction script loaded successfully.");
+            System.out.println("analyze_sentiment function loaded successfully.");
+            
+            anomalyFunction = polyglotContext.getBindings(PYTHON).getMember("detect_anomaly");
+            if (anomalyFunction == null || anomalyFunction.isNull()) {
+                System.err.println("Failed to load detect_anomaly function from Python script.");
+                return;
+            }
+            System.out.println("detect_anomaly function loaded successfully.");
 
         } catch (Exception e) {
             System.err.println("Error initializing Python context: " + e.getMessage());
@@ -61,7 +69,7 @@ public class SentimentScoringResource {
     }
 
     @POST
-    @Path("/score")
+    @Path("/sentiment")
     @Consumes(MediaType.TEXT_PLAIN)
     public Response scoreText(String text) {
         try {
@@ -74,6 +82,23 @@ public class SentimentScoringResource {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                 .entity("Error scoring text:" + e.getMessage())
                 .type(MediaType.TEXT_PLAIN)
+                .build();
+        }
+    }
+
+    @POST
+    @Path("/anomaly")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response detectAnomaly(String record) {
+        try {
+            String result = detectAnomalyScore(record);
+            return Response.ok(result, MediaType.APPLICATION_JSON).build();
+        } catch (Exception e) {
+            System.err.println("Error during anomaly detection: " + e.getMessage());
+            e.printStackTrace();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                .entity("{\"error\":\"Error detecting anomaly: " + e.getMessage() + "\"}")
+                .type(MediaType.APPLICATION_JSON)
                 .build();
         }
     }
@@ -91,6 +116,21 @@ public class SentimentScoringResource {
         Value textValue = polyglotContext.asValue(text);
         // Call the Python scoring function
         Value result = scoreFunction.execute(textValue);
+        return result.asString();
+    }
+
+    @Tool(description="Detects anomalies in a transaction record using Isolation Forest")
+    public String detectAnomalyScore(
+    @ToolArg(description = "JSON transaction record to analyze") String record) {
+        System.err.println("Anomaly Detection Function value : " + anomalyFunction);
+        if (anomalyFunction == null || !anomalyFunction.canExecute()) {
+            System.err.println("Anomaly detection function is not properly initialized.");
+            return "{\"error\":\"Server Not Ready\"}";
+        }
+
+        Value recordValue = polyglotContext.asValue(record);
+        // Call the Python anomaly detection function
+        Value result = anomalyFunction.execute(recordValue);
         return result.asString();
     }
 

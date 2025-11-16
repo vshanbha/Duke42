@@ -138,6 +138,9 @@
                             <packages>
                                 <!-- Select Python packages to install via pip. -->
                                 <package>textblob==0.19.0</package>
+                                <package>joblib==1.5.2</package>
+                                <package>scikit-learn==1.7.2</package>
+                                <package>numpy==2.2.4</package>
                             </packages>
                         </configuration>
                         <goals>
