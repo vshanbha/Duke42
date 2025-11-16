@@ -42,11 +42,12 @@ Duke42 is organized into **planets**, each showcasing a different part of the Ja
 | **Polyglot** | Java ↔ Python pipelines | GraalVM polyglot integration, sentiment analysis, more |
 | **Protocol** | AI workflow orchestration | Connect Java services using MCP/LangChain4j for full pipelines |
 
-Supporting modules:
+Supporting modules and notable folders:
 
-- **common** – shared models, DTOs, and utilities  
-- **backend** – Quarkus-based backend with REST endpoints for each planet  
-- **ui** – JavaFX frontend where Duke guides you interactively  
+- `AnomalyDetector/` – Python anomaly detection project (data, model, tests)
+- `backend/` – Quarkus-based backend with REST endpoints and server logic
+- `polyglot/` – experimental GraalVM polyglot integration (Python from Java)
+- `ui/` – JavaFX frontend where Duke guides you interactively
 
 ---
 
@@ -75,15 +76,14 @@ Supporting modules:
 ### 📂 Repository Structure
 
 ```
-duke42/
-│
-├── common/       # Shared models, DTOs, utilities
-├── backend/      # Quarkus backend services
-├── edge/         # Local LLM handling
-├── polyglot/     # GraalVM polyglot services
-├── protocol/     # Workflow orchestration services
-├── ui/           # JavaFX frontend
-└── pom.xml       # Maven parent POM
+Duke42/
+├── AnomalyDetector/   # Python anomaly detection project
+├── backend/           # Quarkus backend services
+├── polyglot/          # GraalVM polyglot (experimental)
+├── ui/                # JavaFX frontend
+├── pom.xml            # Maven parent POM
+├── LICENSE
+└── README.md
 ```
 
 ### Build & Run
@@ -100,22 +100,38 @@ cd duke42
 mvn clean install
 ```
 
-**3. Run the backend in dev mode**
+**3. Run the Polyglot module**
+
+The Polyglot module uses Python code and libraries through GraalPy. During development we have observed that GraalPy does not initialize properly in quarkus dev mode. 
+
+```bash
+cd polyglot
+mvn clean install
+java -jar target/polyglot-runner.jar
+```
+
+**4. Run the backend in dev mode**
+
+The backend module can use the Polyglot module as an MCP server running on the port 9000. By default the `application.properties` has the MCP configuration commented to allow unit tests to run without MCP. 
+
+If Unit tests need to be run with MCP configuration, then ensure that the Polyglot module is up and running.
 
 ```bash
 cd backend
 mvn quarkus:dev
 ```
 
-**4. Run the JavaFX UI**
+**5. Run the JavaFX UI**
 
 ```bash
 cd ui
 mvn javafx:run
 ```
 
-**5. Optional: Build native image for ultra-fast startup**
+**6. Optional: Build native image for ultra-fast startup**
 
+This works for the backend and polyglot modules.
+e.g. for the backend:
 ```bash
 cd backend
 mvn package -Pnative
@@ -134,13 +150,14 @@ Participants exploring Duke42 will:
 
 ## 📚 References
 
-- [Bank Transaction Dataset for Fraud Detection](https://www.kaggle.com/datasets/valakhorasani/bank-transaction-dataset-for-fraud-detection/data)
 - [Quarkus Langchain4j extension](https://docs.quarkiverse.io/quarkus-langchain4j/dev/)
 - [Langchain4j](https://docs.langchain4j.dev/)
 - [Smollm2 models](https://ollama.com/library/smollm2)
 - [Qwen3 models](https://ollama.com/library/qwen3)
+- [LLama3.2 models](https://ollama.com/library/llama3.2)
 - [Baeldung](https://www.baeldung.com/langchain4j-quarkus-mcp)
 - [Using Multiple models](https://www.the-main-thread.com/p/agentic-java-multi-model-ai-quarkus)
+- [Bank Transaction Dataset for Fraud Detection](https://www.kaggle.com/datasets/valakhorasani/bank-transaction-dataset-for-fraud-detection/data)
 
 ## 💡 Contributing
 
