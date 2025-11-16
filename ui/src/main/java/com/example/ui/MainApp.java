@@ -49,6 +49,8 @@ public class MainApp extends Application {
         Button infer = new Button();
         TextArea output = new TextArea();
         output.setEditable(false);
+        output.setWrapText(true);
+        output.setStyle("-fx-font-size: 14px;");
     
         infer.setOnAction(e -> {
             String p = prompt.getText(); // Grab the prompt text from the UI thread
@@ -168,6 +170,8 @@ public class MainApp extends Application {
                 Label aiMessage = new Label("AI: " + task.getValue());
                 humanMessage.setWrapText(true);
                 aiMessage.setWrapText(true);
+                humanMessage.setStyle("-fx-font-size: 14px;");
+                aiMessage.setStyle("-fx-font-size: 14px;");
 
                 output.getChildren().addAll(humanMessage, aiMessage);
                 input.clear();
@@ -178,6 +182,7 @@ public class MainApp extends Application {
             task.setOnFailed(event -> {
                 Label errorMessage = new Label("Error: " + task.getException().getMessage());
                 output.getChildren().add(errorMessage);
+                errorMessage.setStyle("-fx-font-size: 14px;");
                 errorMessage.setWrapText(true);
                 send.setDisable(false);
             });
