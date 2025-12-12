@@ -89,7 +89,7 @@ public class EdgeResourceTest {
     @Test
     public void testChatHistoryOutsideMessageWindow() {
 
-        String message1 = "My name is Duke42";
+        String message1 = "My name is Duke42. Don't use this name in conversation unless I explicitly ask";
         String messageX = "One line of text - Hitchhikers Guide To Galaxy Trivia";
         String messageN = "What is my name?";
 
