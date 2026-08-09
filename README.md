@@ -1,64 +1,40 @@
 # Duke42 🚀
 
-*Duke42 – your Hitchhiker’s Guide to the Java AI Galaxy*
+*Duke42 – your Hitchhiker's Guide to the Java AI Galaxy*
 
-Welcome aboard! I’m **Duke**, your trusty Java mascot and pilot, here to navigate you through the far reaches of the **Java + GenAI universe**. From running **local LLMs** to **polyglot Java + Python libraries** and **AI workflow orchestration**, we’ll explore it all—no towels required… unless you’re feeling particularly intergalactic.
-
-
-                        .       ☆
-          .      *                .
-    .          .        *
-                 .
-        *              .
-                 ✦
-          .          *
-                       .
-             ☆
-
-                 🛸
-                / \
-               | D |   <- Duke, piloting the ship
-                \_/
-
-       ~ Edge Planet ~         ~ Polyglot Planet ~         ~ Protocol Planet ~
-           (💻)                     (🐍)                       (⚙️)
-              o----------------------o---------------------------o
-               \                     |                           /
-                \                    |                          /
-                 \                   |                         /
-                  \                  |                        /
-                   *-----------------*-----------------------*
-                       <--- Warp lanes / AI pipelines --->
+Welcome aboard! I'm **Duke**, your trusty Java mascot and pilot, here to navigate you through the far reaches of the **Java + GenAI universe**. From running **local LLMs** to **polyglot Java + Python libraries** and **AI workflow orchestration**, we'll explore it all—no towels required… unless you're feeling particularly intergalactic.
 
 ---
 
 ## 🌌 Galaxy Overview
 
-Duke42 is organized into **planets**, each showcasing a different part of the Java GenAI ecosystem:
+Duke42 is organized into **workshop modules**, each showcasing a different part of the Java GenAI ecosystem:
 
-| Planet     | Mission                  | Key Features |
-|-----------|--------------------------|--------------|
-| **Edge**   | Local LLM inference       | Run LLMs offline (Ollama), privacy-friendly for enterprises |
+| Module | Mission | Key Features |
+|--------|---------|--------------|
+| **Edge** | Local LLM inference | Run LLMs offline (Ollama), privacy-friendly for enterprises |
 | **Polyglot** | Java ↔ Python pipelines | GraalVM polyglot integration, sentiment analysis, more |
 | **Protocol** | AI workflow orchestration | Connect Java services using MCP/LangChain4j for full pipelines |
+| **Spring AI** | Enterprise AI integration | Spring AI CLI Agent with tools, memory, and advisors |
 
 Supporting modules and notable folders:
 
-- `AnomalyDetector/` – Python anomaly detection project (data, model, tests)
 - `backend/` – Quarkus-based backend with REST endpoints and server logic
 - `polyglot/` – experimental GraalVM polyglot integration (Python from Java)
 - `ui/` – JavaFX frontend where Duke guides you interactively
+- `spring-ai-cli-agent/` – Spring AI CLI Agent learning project (new direction)
 
 ---
 
 ## ⚡ Why Duke42?
 
 - Fully **Java-native**: UI + backend + AI services  
-- Modular design: planets can be explored independently  
+- Modular design: workshops can be explored independently  
 - **GraalVM native image-ready**: lightning-fast startup for demos  
 - Offline-first, privacy-conscious **Edge LLM integration**  
-- Polyglot support via **GraalVM Context** for Python AI libraries  
+- Polyglot support via **GraalVM Context** for Python AI AI libraries  
 - AI workflow orchestration through **LangChain4j / MCP**  
+- Enterprise AI integration with **Spring AI**  
 - And of course… **Duke pilots the galaxy!** 🪐  
 
 ---
@@ -77,9 +53,9 @@ Supporting modules and notable folders:
 
 ```
 Duke42/
-├── AnomalyDetector/   # Python anomaly detection project
 ├── backend/           # Quarkus backend services
 ├── polyglot/          # GraalVM polyglot (experimental)
+├── spring-ai-cli-agent/  # Spring AI CLI Agent (new direction)
 ├── ui/                # JavaFX frontend
 ├── pom.xml            # Maven parent POM
 ├── LICENSE
@@ -128,7 +104,14 @@ cd ui
 mvn javafx:run
 ```
 
-**6. Optional: Build native image for ultra-fast startup**
+**6. Run the Spring AI CLI Agent**
+
+```bash
+cd spring-ai-cli-agent
+mvn spring-boot:run
+```
+
+**7. Optional: Build native image for ultra-fast startup**
 
 This works for the backend and polyglot modules.
 e.g. for the backend:
@@ -146,18 +129,20 @@ Participants exploring Duke42 will:
 - Run local LLMs securely and offline
 - Extend Java apps with Python AI libraries via GraalVM
 - Connect Java services into AI workflows
+- Build enterprise AI agents with Spring AI
 - Gain a mental map of Java GenAI possibilities for enterprise applications
 
 ## 📚 References
 
 - [Quarkus Langchain4j extension](https://docs.quarkiverse.io/quarkus-langchain4j/dev/)
 - [Langchain4j](https://docs.langchain4j.dev/)
+- [Spring AI](https://docs.spring.io/spring-ai/reference/)
 - [Smollm2 models](https://ollama.com/library/smollm2)
 - [Qwen3 models](https://ollama.com/library/qwen3)
 - [LLama3.2 models](https://ollama.com/library/llama3.2)
 - [Baeldung](https://www.baeldung.com/langchain4j-quarkus-mcp)
 - [Using Multiple models](https://www.the-main-thread.com/p/agentic-java-multi-model-ai-quarkus)
-- [Bank Transaction Dataset for Fraud Detection](https://www.kaggle.com/datasets/valakhorasani/bank-transaction-dataset-for-fraud-detection/data)
+- [Software AI Factory](https://softwareaifactory.sh/)
 
 ## 💡 Contributing
 
@@ -165,8 +150,10 @@ Duke42 thrives on curiosity and collaboration. Contributions welcome:
 - New AI workflow demos
 - Extended Edge / Polyglot capabilities
 - UI improvements or visualizations
+- Enterprise AI integration patterns
 
-Fork, code, and submit pull requests—we’ll navigate the galaxy together!
+Fork, code, and submit pull requests—we'll navigate the galaxy together!
 
 ## 🪐 License
+
 MIT License – explore, adapt, and share freely!
