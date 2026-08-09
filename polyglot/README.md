@@ -1,8 +1,7 @@
 # polyglot
 
 This is a partially complete project meant to consume a Python model using GraalPy.
-Original Plan was to use this with the model produced by the [AnomalyDetector project](../AnomalyDetector). However, GraalPy builds seem to run into issues with NumPy.
-Then attempt was made to work with the natural language model inside TextBlob to offer sentiment scoring. That too ran into the same issue during build. 
+GraalPy builds seem to run into issues with NumPy and TextBlob during build.
 
 Likely builds only work on Linux / MacOS. 
 This sub project needs to be revisited
