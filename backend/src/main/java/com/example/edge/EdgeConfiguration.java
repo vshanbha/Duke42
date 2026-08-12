@@ -21,12 +21,9 @@ class EdgeConfiguration {
     }
 
     @Bean
-    ChatClient chatClient(ChatModel chatModel, ChatMemory chatMemory,
-                          ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider) {
+    ChatClient chatClient(ChatModel chatModel, ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider) {
         ChatClient.Builder builder = ChatClient.builder(chatModel);
-
         mcpProvider.ifAvailable(provider -> builder.defaultTools(provider));
-
         return builder.build();
     }
 
@@ -37,9 +34,7 @@ class EdgeConfiguration {
             .defaultAdvisors(
                 MessageChatMemoryAdvisor.builder(chatMemory).build()
             );
-
         mcpProvider.ifAvailable(provider -> builder.defaultTools(provider));
-
         return builder.build();
     }
 }

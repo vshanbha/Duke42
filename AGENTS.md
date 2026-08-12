@@ -20,7 +20,7 @@ cd polyglot && java -jar target/polyglot-runner.jar  # Polyglot MCP server (port
 # CLI Agent tests (31 tests)
 cd spring-ai-cli-agent && mvn test
 
-# Backend tests (6 tests: 2 unit + 4 e2e)
+# Backend tests (12 tests: 6 unit + 4 e2e + 2 GraphQL)
 cd backend && mvn test
 
 # Run all tests in a module
@@ -32,7 +32,7 @@ mvn test
 | Module | Purpose | Port | Tests |
 |--------|---------|------|-------|
 | `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | 31 (unit + integration) |
-| `backend/` | Enterprise demo (Vaadin + REST + MCP) | 8080 | 6 (unit + e2e) |
+| `backend/` | Enterprise demo (Vaadin + REST + GraphQL + MCP) | 8080 | 12 (unit + e2e + GraphQL) |
 | `polyglot/` | GraalVM Python integration (MCP server) | 9000 | 3 (integration) |
 
 ## Critical Quirks
