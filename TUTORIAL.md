@@ -1015,6 +1015,75 @@ After completing this tutorial:
 
 ---
 
+## Step 9: Enterprise Backend (Optional)
+
+The `backend/` module provides a Vaadin web UI and REST API for enterprise demos.
+
+### Architecture
+
+```
+Backend (port 8080)          CLI Agent (port 8081)
+┌─────────────────┐          ┌─────────────────┐
+│  Vaadin Web UI  │          │  Terminal REPL   │
+│  /chat          │          │                 │
+├─────────────────┤          └─────────────────┘
+│  REST API       │
+│  /edge/*        │          Both use the same
+├─────────────────┤          Spring AI ChatClient
+│  MCP Client     │          with Ollama (lfm2.5)
+│  (polyglot)     │
+└─────────────────┘
+```
+
+### Run the Backend
+
+```bash
+cd backend
+mvn spring-boot:run
+
+# Open browser to http://localhost:8080
+# You'll see the Vaadin chat interface
+```
+
+### REST API (for JavaScript developers)
+
+```bash
+# Single-shot inference
+curl -X POST http://localhost:8080/edge/infer \
+  -H "Content-Type: text/plain" \
+  -d "Hello"
+
+# Chat with memory
+curl -X POST "http://localhost:8080/edge/chat/USER-123?message=My%20name%20is%20Alice" \
+  -H "Content-Type: text/plain"
+
+# Follow up (AI remembers)
+curl -X POST "http://localhost:8080/edge/chat/USER-123?message=What%27s%20my%20name%3F" \
+  -H "Content-Type: text/plain"
+```
+
+### Enable MCP (connect to polyglot)
+
+1. Start the polyglot MCP server:
+```bash
+cd polyglot
+mvn clean install
+java -jar target/polyglot-runner.jar
+```
+
+2. Enable MCP in `backend/src/main/resources/application.yaml`:
+```yaml
+spring:
+  ai:
+    mcp:
+      client:
+        enabled: true
+```
+
+3. Restart the backend. The AI can now call the sentiment analysis tool.
+
+---
+
 ## References
 
 ### Spring AI
@@ -1046,6 +1115,17 @@ After completing this tutorial:
 
 - [Spring AI Overview](https://www.baeldung.com/spring-ai) — Baeldung's Spring AI series
 - [Introduction to Spring AI](https://www.baeldung.com/spring-ai-introduction) — Getting started with Spring AI
+
+### Vaadin
+
+- [Vaadin Documentation](https://vaadin.com/docs) — Official reference
+- [Vaadin Spring Boot](https://vaadin.com/docs/latest/spring/overview) — Spring Boot integration
+- [Vaadin AI Integration](https://vaadin.com/docs/latest/building-apps/ai) — Built-in AI components
+
+### Model Context Protocol (MCP)
+
+- [MCP Specification](https://modelcontextprotocol.io/specification/) — Official spec
+- [Spring AI MCP](https://docs.spring.io/spring-ai/reference/api/mcp/mcp-overview.html) — Spring AI MCP docs
 
 ---
 
