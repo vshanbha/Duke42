@@ -38,4 +38,20 @@ class EdgeController {
             .call()
             .content();
     }
+
+    @PostMapping(value = "/toolChat/{chatId}", consumes = MediaType.TEXT_PLAIN_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
+    public String toolChat(
+        @PathVariable String chatId,
+        @RequestParam String message
+    ) {
+        if (chatId == null || chatId.trim().isEmpty()) {
+            return "User ID cannot be empty.";
+        }
+
+        return chatClient.prompt()
+            .user(message)
+            .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, chatId + "-tools"))
+            .call()
+            .content();
+    }
 }

@@ -1,8 +1,8 @@
-# Blueprint: Spring AI CLI Agent — Learning Path & Project
+# Blueprint: Spring AI — Learning Path & Project
 
-**Goal**: Build a general-purpose CLI assistant that teaches Spring AI concepts step by
-**End product**: A downloadable executable jar — run it, chat with an AI in your terminal
-**Stack**: Spring Boot 4 + Spring AI 2.0 + Ollama (local, free, no API keys)
+**Goal**: Build a general-purpose AI assistant that teaches Spring AI concepts step by step
+**End products**: A CLI agent (terminal) + a Vaadin web UI (browser) + a REST API (for JS devs)
+**Stack**: Spring Boot 4 + Spring AI 2.0 + Ollama (local, free, no API keys) + Vaadin 25
 
 ---
 
@@ -41,19 +41,75 @@ ollama run lfm2.5 "Say hello"
 ## PROJECT STRUCTURE
 
 ```
-spring-ai-cli-agent/
-├── pom.xml
-├── src/main/java/com/example/cliai/
-│   ├── Application.java                    # Step 1: Entry point
-│   ├── agent/
-│   │   ├── AgentConfiguration.java         # Step 1: ChatClient bean
-│   │   └── tools/
-│   │       └── CalculatorTool.java         # Step 5: Custom tool
-│   └── cli/
-│       └── ChatLoop.java                   # Step 1: Interactive REPL
-├── src/main/resources/
-│   └── application.yaml                    # Step 1: Ollama config
-└── README.md
+Duke42/
+├── spring-ai-cli-agent/           # Learning project (CLI)
+│   ├── pom.xml
+│   ├── src/main/java/com/example/cliai/
+│   │   ├── Application.java
+│   │   ├── agent/
+│   │   │   ├── AgentConfiguration.java
+│   │   │   └── tools/
+│   │   │       ├── CalculatorTool.java
+│   │   │       └── UnitConverterTool.java
+│   │   └── cli/
+│   │       └── ChatLoop.java
+│   └── src/test/java/             # 31 tests
+│
+├── backend/                       # Enterprise demo (Vaadin + REST + MCP)
+│   ├── pom.xml
+│   ├── src/main/java/com/example/edge/
+│   │   ├── Application.java
+│   │   ├── EdgeConfiguration.java
+│   │   ├── EdgeController.java
+│   │   └── ui/
+│   │       ├── ChatView.java     # Vaadin web UI
+│   │       └── ChatService.java  # Wraps ChatClient
+│   └── src/main/resources/
+│       └── application.yaml
+│
+├── polyglot/                      # MCP server (Quarkus, GraalPy)
+│   └── src/main/java/com/example/
+│       └── SentimentScoringResource.java
+│
+└── BLUEPRINT-CLI-Agent.md         # This file
+```
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────┐
+│         Backend (Spring Boot, port 8080)          │
+│                                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────┐ │
+│  │  Vaadin UI  │  │  REST API   │  │  MCP     │ │
+│  │  /chat      │  │  /edge/*    │  │  Client  │ │
+│  │  (browser)  │  │  (for JS    │  │  (polyglot│ │
+│  │             │  │   devs)     │  │   MCP)   │ │
+│  └──────┬──────┘  └──────┬──────┘  └────┬─────┘ │
+│         │                │              │        │
+│         └────────────────┼──────────────┘        │
+│                          │                       │
+│                   ┌──────┴──────┐                │
+│                   │ Spring AI   │                │
+│                   │ ChatClient  │                │
+│                   │ + Memory    │                │
+│                   │ + Tools     │                │
+│                   └──────┬──────┘                │
+│                          │                       │
+│                   ┌──────┴──────┐                │
+│                   │   Ollama    │                │
+│                   └─────────────┘                │
+└──────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────┐
+│      CLI Agent (Spring Boot, port 8081)           │
+│      Terminal REPL, separate module               │
+└──────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────┐
+│      Polyglot MCP Server (Quarkus, port 9000)     │
+│      Python sentiment analysis via GraalPy        │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
@@ -728,6 +784,113 @@ After completing this project, consider exploring:
 
 - **Subagent orchestration** — delegate tasks to specialized agents
 - **RAG** — add document retrieval with vector stores
-- **MCP** — connect to external tool servers
 - **Streaming** — use `.stream()` instead of `.call()` for real-time output
 - **Multi-model** — route different tasks to different models
+
+---
+
+## BACKEND MODULE (Enterprise Demo)
+
+The backend module provides a Vaadin web UI, REST API, and MCP client for enterprise demos.
+
+### Backend Dependencies
+
+```xml
+<parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.0.0</version>
+</parent>
+
+<properties>
+    <java.version>17</java.version>
+    <spring-ai.version>2.0.0</spring-ai.version>
+</properties>
+
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-bom</artifactId>
+            <version>${spring-ai.version}</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.ai</groupId>
+        <artifactId>spring-ai-starter-model-ollama</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.ai</groupId>
+        <artifactId>spring-ai-starter-mcp-client</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>com.vaadin</groupId>
+        <artifactId>vaadin-spring-boot-starter</artifactId>
+        <version>25.2.6</version>
+    </dependency>
+</dependencies>
+```
+
+### Backend Application.yaml
+
+```yaml
+spring:
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: lfm2.5
+    mcp:
+      client:
+        enabled: false
+        sse:
+          connections:
+            polyglot:
+              url: http://localhost:9000
+
+server:
+  port: 8080
+```
+
+### Backend REST Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/edge/infer` | POST | Single-shot LLM inference |
+| `/edge/chat/{chatId}` | POST | Chat with memory (query param: message) |
+| `/edge/toolChat/{chatId}` | POST | Chat with MCP tools (query param: message) |
+
+### Vaadin ChatView (Minimal)
+
+```java
+@Route("chat")
+public class ChatView extends Composite<Div> {
+
+    private final ChatService chatService;
+    private final TextField input = new TextField();
+    private final Div messages = new Div();
+
+    public ChatView(ChatService chatService) {
+        this.chatService = chatService;
+        // Build minimal chat UI
+        // Input field + send button
+        // Message list
+    }
+}
+```
+
+### Backend Tests
+
+```bash
+cd backend && mvn test
+```

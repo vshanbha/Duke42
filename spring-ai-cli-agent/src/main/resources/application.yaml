@@ -12,3 +12,6 @@ spring:
           connections:
             polyglot:
               url: http://localhost:9000
+
+server:
+  port: 8081
