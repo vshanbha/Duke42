@@ -31,6 +31,7 @@ A complete learning project that teaches Spring AI concepts step by step:
 5. Multiple tool calling flow
 6. SimpleLoggerAdvisor for debugging
 7. Executable jar packaging
+8. Unit tests (29 tests: CalculatorTool, UnitConverterTool, AgentConfiguration, ChatLoop)
 
 ---
 
@@ -77,11 +78,12 @@ Adopted patterns from softwareaifactory.sh for enterprise-grade development:
 
 ### Day 7-8: Enterprise Patterns
 - Workshop 7: Packaging as Executable Jar (2 hours)
-- Workshop 8: Enterprise Integration Patterns (2 hours)
+- Workshop 8: Unit Testing (2 hours)
+- Workshop 9: Enterprise Integration Patterns (2 hours)
 
 ### Day 9-10: Production Readiness
-- Workshop 9: Monitoring and Observability (2 hours)
-- Workshop 10: Final Project Review (2 hours)
+- Workshop 10: Monitoring and Observability (2 hours)
+- Workshop 11: Final Project Review (2 hours)
 
 ---
 
@@ -96,9 +98,10 @@ The tutorial maps to sections in the Baeldung article:
 5. **Advanced Tooling** - Multiple tools, tool calling flow
 6. **Advisors** - Logging, composition, debugging
 7. **Packaging** - Executable jar, optional native image
-8. **Enterprise Patterns** - API integration, error handling
-9. **Production Readiness** - Monitoring, metrics, deployment
-10. **Conclusion** - Next steps and resources
+8. **Testing** - Unit tests with JUnit 5, AssertJ, Mockito
+9. **Enterprise Patterns** - API integration, error handling
+10. **Production Readiness** - Monitoring, metrics, deployment
+11. **Conclusion** - Next steps and resources
 
 ---
 
@@ -107,7 +110,7 @@ The tutorial maps to sections in the Baeldung article:
 ### Prerequisites
 - Java 17+ (Spring AI 2.0 requirement)
 - Maven 3.6+
-- Ollama CLI with models: `qwen2.5`, `llama3.1`, `mistral`
+- Ollama CLI with models: `lfm2.5`, `qwen2.5`, `llama3.1`, `mistral`
 
 ### Run the Agent
 ```bash
@@ -136,6 +139,13 @@ mvn clean package -DskipTests
 java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 ```
 
+### Run Tests
+```bash
+cd spring-ai-cli-agent
+mvn test
+# 29 tests covering CalculatorTool, UnitConverterTool, AgentConfiguration, ChatLoop
+```
+
 ---
 
 ## Environment Requirements
@@ -152,8 +162,9 @@ java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 
 - `README.md` - Repository overview and quick start
 - `AGENTS.md` - Agent instructions and conventions
-- `TUTORIAL-ROADMAP.md` - Detailed 7-10 day learning path
-- `BLUEPRINT-CLI-Agent.md` - Complete blueprint for Spring AI CLI Agent
+- `TUTORIAL.md` - Step-by-step tutorial (start here)
+- `TUTORIAL-ROADMAP.md` - Workshop plan (11 workshops)
+- `BLUEPRINT-CLI-Agent.md` - Code reference for Spring AI CLI Agent
 - `ollama-model-links.md` - Ollama model comparison and selection guide
 - `spring-ai-cli-agent/` - Complete Spring AI CLI Agent project
 

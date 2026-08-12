@@ -179,7 +179,28 @@ java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 # Test all features
 ```
 
-### Workshop 8: Enterprise Integration Patterns (2 hours)
+### Workshop 8: Unit Testing (2 hours)
+**Concept**: Write unit tests for your tools and components using JUnit 5, AssertJ, and Mockito. No external dependencies required.
+
+**Learning Outcomes**:
+- Write unit tests for `@Tool` methods
+- Test component wiring with mocked dependencies
+- Use AssertJ for fluent assertions
+- Verify CLI loop behavior with Mockito
+
+**Key Files**:
+- `CalculatorToolTest.java` — 12 tests for math expressions
+- `UnitConverterToolTest.java` — 12 tests for all conversion paths
+- `AgentConfigurationTest.java` — 2 tests for bean wiring
+- `ChatLoopTest.java` — 3 tests for REPL logic
+
+**Verification**:
+```bash
+mvn test
+# 29 tests should pass
+```
+
+### Workshop 9: Enterprise Integration Patterns (2 hours)
 **Concept**: Connect your AI agent to enterprise systems using Spring's integration patterns.
 
 **Learning Outcomes**:
@@ -205,7 +226,7 @@ mvn spring-boot:run
 
 ## Day 9-10: Production Readiness
 
-### Workshop 9: Monitoring and Observability (2 hours)
+### Workshop 10: Monitoring and Observability (2 hours)
 **Concept**: Add monitoring, metrics, and tracing to your AI agent for production deployment.
 
 **Learning Outcomes**:
@@ -227,7 +248,7 @@ mvn spring-boot:run
 # Test tracing
 ```
 
-### Workshop 10: Final Project Review (2 hours)
+### Workshop 11: Final Project Review (2 hours)
 **Concept**: Review all concepts, optimize performance, and prepare for deployment.
 
 **Learning Outcomes**:
@@ -255,9 +276,10 @@ The 7-10 day tutorial maps to sections in the Baeldung article:
 5. **Advanced Tooling** - Multiple tools, tool calling flow
 6. **Advisors** - Logging, composition, debugging
 7. **Packaging** - Executable jar, optional native image
-8. **Enterprise Patterns** - API integration, error handling
-9. **Production Readiness** - Monitoring, metrics, deployment
-10. **Conclusion** - Next steps and resources
+8. **Testing** - Unit tests with JUnit 5, AssertJ, Mockito
+9. **Enterprise Patterns** - API integration, error handling
+10. **Production Readiness** - Monitoring, metrics, deployment
+11. **Conclusion** - Next steps and resources
 
 ---
 
@@ -291,15 +313,15 @@ Adopted patterns from softwareaifactory.sh:
 
 - Java 17+ (Spring AI 2.0 requirement)
 - Maven 3.6+
-- Ollama CLI with models: `qwen2.5`, `llama3.1`, `mistral`
+- Ollama CLI with models: `lfm2.5`, `qwen2.5`, `llama3.1`, `mistral`
 - GraalVM 21+ (optional, for native image)
 
 ## Common Pitfalls
 
 1. **Ollama not running**: `Connection refused` on localhost:11434
-2. **Wrong model**: Tool calling requires `qwen2.5`, `llama3.1`, or `mistral`
+2. **Wrong model**: Tool calling requires `lfm2.5`, `qwen2.5`, `llama3.1`, or `mistral`
 3. **Slow first response**: Ollama loads model into RAM on first call
-4. **OutOfMemoryError**: Use smaller model like `qwen2.5:3b`
+4. **OutOfMemoryError**: Use smaller model like `lfm2.5`
 5. **Build fails**: Skip native image for now, use `java -jar`
 
 ---

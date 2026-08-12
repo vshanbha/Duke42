@@ -2,40 +2,41 @@
 
 *Duke42 – your Hitchhiker's Guide to the Java AI Galaxy*
 
-Welcome aboard! I'm **Duke**, your trusty Java mascot and pilot, here to navigate you through the far reaches of the **Java + GenAI universe**. From running **local LLMs** to **polyglot Java + Python libraries** and **AI workflow orchestration**, we'll explore it all—no towels required… unless you're feeling particularly intergalactic.
+Welcome aboard! I'm **Duke**, your trusty Java mascot and pilot, here to navigate you through the far reaches of the **Java + GenAI universe**.
 
 ---
 
 ## 🌌 Galaxy Overview
 
-Duke42 is organized into **workshop modules**, each showcasing a different part of the Java GenAI ecosystem:
+Duke42 has two sides: a **learning path** (Spring AI CLI Agent) and **experimental modules** (Quarkus, GraalVM, MCP).
+
+### Primary: Spring AI CLI Agent
 
 | Module | Mission | Key Features |
 |--------|---------|--------------|
-| **Edge** | Local LLM inference | Run LLMs offline (Ollama), privacy-friendly for enterprises |
-| **Polyglot** | Java ↔ Python pipelines | GraalVM polyglot integration, sentiment analysis, more |
-| **Protocol** | AI workflow orchestration | Connect Java services using MCP/LangChain4j for full pipelines |
-| **Spring AI** | Enterprise AI integration | Spring AI CLI Agent with tools, memory, and advisors |
+| **Spring AI** | Enterprise AI integration | CLI Agent with tools, memory, advisors, Ollama |
 
-Supporting modules and notable folders:
+**Start here →** See [TUTORIAL.md](TUTORIAL.md) for a step-by-step guide.
 
-- `backend/` – Quarkus-based backend with REST endpoints and server logic
-- `polyglot/` – experimental GraalVM polyglot integration (Python from Java)
-- `ui/` – JavaFX frontend where Duke guides you interactively
-- `spring-ai-cli-agent/` – Spring AI CLI Agent learning project (new direction)
+### Experimental: Legacy Modules
+
+These modules explore different parts of the Java GenAI ecosystem. They work but are not the primary focus:
+
+| Module | Mission | Status |
+|--------|---------|--------|
+| **Edge** (`backend/`) | Local LLM inference | Quarkus + LangChain4j |
+| **Polyglot** (`polyglot/`) | Java ↔ Python pipelines | GraalVM polyglot (experimental) |
+| **UI** (`ui/`) | JavaFX frontend | Interactive Duke guide |
 
 ---
 
 ## ⚡ Why Duke42?
 
-- Fully **Java-native**: UI + backend + AI services  
-- Modular design: workshops can be explored independently  
-- **GraalVM native image-ready**: lightning-fast startup for demos  
-- Offline-first, privacy-conscious **Edge LLM integration**  
-- Polyglot support via **GraalVM Context** for Python AI AI libraries  
-- AI workflow orchestration through **LangChain4j / MCP**  
-- Enterprise AI integration with **Spring AI**  
-- And of course… **Duke pilots the galaxy!** 🪐  
+- **Step-by-step learning**: Complete tutorial from zero to working agent
+- **Local & private**: Ollama runs on your machine, no API keys
+- **Enterprise patterns**: Spring AI, advisors, tool calling, memory
+- **Tested**: 31 tests (29 unit + 2 integration)
+- **Modular**: Explore Spring AI or experimental modules independently
 
 ---
 
@@ -43,22 +44,20 @@ Supporting modules and notable folders:
 
 ### Prerequisites
 
-- Java 21+ (LTS recommended)  
-- Maven 4+  
-- GraalVM 21+ (for native image and polyglot features)  
-- Ollama CLI / local LLM setup (for Edge planet)  
-- Optional: Python environment for polyglot demos  
+- Java 17+ (for Spring AI CLI Agent)
+- Maven 3.6+
+- Ollama (for local LLM)
 
 ### 📂 Repository Structure
 
 ```
 Duke42/
-├── backend/           # Quarkus backend services
-├── polyglot/          # GraalVM polyglot (experimental)
-├── spring-ai-cli-agent/  # Spring AI CLI Agent (new direction)
-├── ui/                # JavaFX frontend
-├── pom.xml            # Maven parent POM
-├── LICENSE
+├── spring-ai-cli-agent/     # ★ Start here — Spring AI CLI Agent
+├── backend/                 # Quarkus backend (experimental)
+├── polyglot/                # GraalVM polyglot (experimental)
+├── ui/                      # JavaFX frontend (experimental)
+├── TUTORIAL.md              # ★ Step-by-step tutorial
+├── BLUEPRINT-CLI-Agent.md   # Code reference
 └── README.md
 ```
 
@@ -71,78 +70,82 @@ git clone git@github.com:vshanbha/Duke42.git
 cd duke42
 ```
 
-**2. Build all modules**
-```bash
-mvn clean install
-```
-
-**3. Run the Polyglot module**
-
-The Polyglot module uses Python code and libraries through GraalPy. During development we have observed that GraalPy does not initialize properly in quarkus dev mode. 
-
-```bash
-cd polyglot
-mvn clean install
-java -jar target/polyglot-runner.jar
-```
-
-**4. Run the backend in dev mode**
-
-The backend module can use the Polyglot module as an MCP server running on the port 9000. By default the `application.properties` has the MCP configuration commented to allow unit tests to run without MCP. 
-
-If Unit tests need to be run with MCP configuration, then ensure that the Polyglot module is up and running.
-
-```bash
-cd backend
-mvn quarkus:dev
-```
-
-**5. Run the JavaFX UI**
-
-```bash
-cd ui
-mvn javafx:run
-```
-
-**6. Run the Spring AI CLI Agent**
+**2. Run the Spring AI CLI Agent (recommended)**
 
 ```bash
 cd spring-ai-cli-agent
 mvn spring-boot:run
 ```
 
-**7. Optional: Build native image for ultra-fast startup**
+**3. Follow the tutorial**
 
-This works for the backend and polyglot modules.
-e.g. for the backend:
 ```bash
-cd backend
-mvn package -Pnative
-./target/duke42-runner
+# See TUTORIAL.md for a complete walkthrough
+# Build from scratch in 8 steps with code + explanations
 ```
 
-## 🗺️ Workshop Learning Outcomes
+**4. Run tests**
 
-Participants exploring Duke42 will:
+```bash
+cd spring-ai-cli-agent
+mvn test
+# 31 tests: CalculatorTool, UnitConverterTool, AgentConfiguration, ChatLoop, Integration
+```
 
-- Understand the Java + GenAI galaxy
-- Run local LLMs securely and offline
-- Extend Java apps with Python AI libraries via GraalVM
-- Connect Java services into AI workflows
-- Build enterprise AI agents with Spring AI
-- Gain a mental map of Java GenAI possibilities for enterprise applications
+### Experimental Modules
+
+These require additional setup (Quarkus, GraalVM):
+
+```bash
+# Polyglot (GraalVM Python)
+cd polyglot && mvn clean install && java -jar target/polyglot-runner.jar
+
+# Backend (Quarkus + LangChain4j)
+cd backend && mvn quarkus:dev
+
+# UI (JavaFX)
+cd ui && mvn javafx:run
+```
+
+---
+
+## 📚 Learning Path
+
+| Step | Topic | What You Learn |
+|------|-------|----------------|
+| 1 | Basic ChatClient | Spring AI fundamentals |
+| 2 | Chat Memory | Advisors, conversation persistence |
+| 3 | AskUserQuestionTool | Tool calling, user interaction |
+| 4 | Custom Tool (Calculator) | `@Tool`, SpEL expressions |
+| 5 | Multiple Tools (Unit Converter) | AI tool selection |
+| 6 | Logging Advisor | Debugging AI calls |
+| 7 | Packaging | Executable jar |
+| 8 | Unit Testing | JUnit 5, AssertJ, Mockito |
+
+**Full tutorial**: [TUTORIAL.md](TUTORIAL.md)
+
+---
 
 ## 📚 References
 
-- [Quarkus Langchain4j extension](https://docs.quarkiverse.io/quarkus-langchain4j/dev/)
+### Spring AI
+
+- [Spring AI Documentation](https://docs.spring.io/spring-ai/reference/)
+- [Spring AI ChatClient](https://docs.spring.io/spring-ai/reference/api/chatclient.html)
+- [Spring AI Tool Calling](https://docs.spring.io/spring-ai/reference/api/tool-calling.html)
+
+### Ollama
+
+- [Ollama Website](https://ollama.com/) — Download and install
+- [lfm2.5 Model](https://ollama.com/library/lfm2.5) — Primary model used in tutorial
+
+### Experimental Modules
+
+- [Quarkus Langchain4j](https://docs.quarkiverse.io/quarkus-langchain4j/dev/)
 - [Langchain4j](https://docs.langchain4j.dev/)
-- [Spring AI](https://docs.spring.io/spring-ai/reference/)
-- [Smollm2 models](https://ollama.com/library/smollm2)
-- [Qwen3 models](https://ollama.com/library/qwen3)
-- [LLama3.2 models](https://ollama.com/library/llama3.2)
-- [Baeldung](https://www.baeldung.com/langchain4j-quarkus-mcp)
-- [Using Multiple models](https://www.the-main-thread.com/p/agentic-java-multi-model-ai-quarkus)
-- [Software AI Factory](https://softwareaifactory.sh/)
+- [GraalVM Polyglot](https://www.graalvm.org/reference-manual/polyglot/)
+
+---
 
 ## 💡 Contributing
 
@@ -153,6 +156,8 @@ Duke42 thrives on curiosity and collaboration. Contributions welcome:
 - Enterprise AI integration patterns
 
 Fork, code, and submit pull requests—we'll navigate the galaxy together!
+
+---
 
 ## 🪐 License
 

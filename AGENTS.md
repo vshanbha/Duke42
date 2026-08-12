@@ -58,6 +58,7 @@ mvn verify -Dnative  # Native integration tests
 - Backend tests use `@QuarkusTest` with REST-assured
 - Each test generates unique `chatId` (UUID) for isolation
 - Tests expect Ollama running locally with `llama3.2:1b` model
+- Spring AI CLI Agent tests use JUnit 5 + AssertJ + Mockito (no Ollama required)
 
 ## Environment Requirements
 

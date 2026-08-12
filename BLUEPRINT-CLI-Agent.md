@@ -23,10 +23,10 @@
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Pull a model that supports tool calling
-ollama pull qwen2.5
+ollama pull lfm2.5
 
 # Verify it works
-ollama run qwen2.5 "Say hello"
+ollama run lfm2.5 "Say hello"
 ```
 
 ### Why Ollama?
@@ -34,7 +34,7 @@ ollama run qwen2.5 "Say hello"
 - **Free**: No API keys, no usage limits, no billing
 - **Private**: Everything runs on your machine
 - **Fast**: No network latency for local models
-- **Tool calling**: `qwen2.5`, `llama3.1`, and `mistral` support function calling
+- **Tool calling**: `lfm2.5`, `qwen2.5`, `llama3.1`, and `mistral` support function calling
 
 ---
 
@@ -116,7 +116,7 @@ spring:
       base-url: http://localhost:11434
       chat:
         options:
-          model: qwen2.5
+          model: lfm2.5
 ```
 
 `Application.java`:
@@ -304,16 +304,20 @@ The AI decides when to call based on the tool's description.
 ```java
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 
 class CalculatorTool {
+
+    private final ExpressionParser parser = new SpelExpressionParser();
 
     @Tool(description = "Evaluate a mathematical expression. Supports +, -, *, /, parentheses. Example: (2 + 3) * 4")
     double calculate(
             @ToolParam(description = "The math expression to evaluate") String expression) {
-        // Simple expression evaluator using javax.script
         try {
-            var engine = new javax.script.ScriptEngineManager().getEngineByName("js");
-            Object result = engine.eval(expression);
+            StandardEvaluationContext context = new StandardEvaluationContext();
+            var result = parser.parseExpression(expression).getValue(context);
             return result instanceof Number n ? n.doubleValue() : Double.parseDouble(result.toString());
         } catch (Exception e) {
             throw new IllegalArgumentException("Cannot evaluate: " + expression, e);
@@ -580,7 +584,7 @@ spring:
       base-url: http://localhost:11434
       chat:
         options:
-          model: qwen2.5
+          model: lfm2.5
 ```
 
 ### `AgentConfiguration.java` (complete)
@@ -711,9 +715,9 @@ java -jar spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 | Issue | Fix |
 |---|---|
 | `Connection refused` on Ollama | `ollama serve` must be running |
-| Tool calling doesn't work | Use a model that supports it: `qwen2.5`, `llama3.1`, `mistral` |
+| Tool calling doesn't work | Use a model that supports it: `lfm2.5`, `qwen2.5`, `llama3.1`, `mistral` |
 | Slow first response | Ollama loads the model into RAM on first call; subsequent calls are fast |
-| `OutOfMemoryError` | Use a smaller model: `ollama pull qwen2.5:3b` |
+| `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` |
 | Build fails on native image | Skip native for now, use `java -jar` |
 
 ---
