@@ -14,11 +14,25 @@ import org.springframework.context.annotation.Configuration;
 class EdgeConfiguration {
 
     @Bean
-    ChatClient chatClient(ChatModel chatModel, ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider) {
-        ChatMemory chatMemory = MessageWindowChatMemory.builder()
+    ChatMemory chatMemory() {
+        return MessageWindowChatMemory.builder()
             .maxMessages(10)
             .build();
+    }
 
+    @Bean
+    ChatClient chatClient(ChatModel chatModel, ChatMemory chatMemory,
+                          ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider) {
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+
+        mcpProvider.ifAvailable(provider -> builder.defaultTools(provider));
+
+        return builder.build();
+    }
+
+    @Bean
+    ChatClient chatClientWithMemory(ChatModel chatModel, ChatMemory chatMemory,
+                                     ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider) {
         ChatClient.Builder builder = ChatClient.builder(chatModel)
             .defaultAdvisors(
                 MessageChatMemoryAdvisor.builder(chatMemory).build()
