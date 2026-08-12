@@ -5,3 +5,10 @@ spring:
       chat:
         options:
           model: lfm2.5
+    mcp:
+      client:
+        enabled: false
+        sse:
+          connections:
+            polyglot:
+              url: http://localhost:9000

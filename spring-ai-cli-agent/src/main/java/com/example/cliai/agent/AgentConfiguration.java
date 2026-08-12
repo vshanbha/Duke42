@@ -10,6 +10,8 @@ import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,12 +19,12 @@ import org.springframework.context.annotation.Configuration;
 class AgentConfiguration {
 
     @Bean
-    ChatClient chatClient(ChatModel chatModel) {
+    ChatClient chatClient(ChatModel chatModel, ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
             .maxMessages(20)
             .build();
 
-        return ChatClient.builder(chatModel)
+        ChatClient.Builder builder = ChatClient.builder(chatModel)
             .defaultTools(
                 AskUserQuestionTool.builder()
                     .questionHandler(new CommandLineQuestionHandler())
@@ -33,7 +35,10 @@ class AgentConfiguration {
             .defaultAdvisors(
                 new SimpleLoggerAdvisor(),
                 MessageChatMemoryAdvisor.builder(chatMemory).build()
-            )
-            .build();
+            );
+
+        mcpProvider.ifAvailable(provider -> builder.defaultTools(provider));
+
+        return builder.build();
     }
 }
