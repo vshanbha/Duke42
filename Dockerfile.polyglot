@@ -1,0 +1,12 @@
+FROM ghcr.io/graalvm/native-image-community:21 AS polyglot
+
+WORKDIR /app
+
+# Copy the built jar
+COPY polyglot/target/polyglot-runner.jar app.jar
+
+# Expose port
+EXPOSE 9000
+
+# Run
+ENTRYPOINT ["java", "-jar", "app.jar"]
