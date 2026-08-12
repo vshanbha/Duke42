@@ -1,0 +1,11 @@
+type Query {
+  infer(prompt: String!): String
+  chat(chatId: String!, message: String!): String
+  toolChat(chatId: String!, message: String!): String
+}
+
+type Mutation {
+  infer(prompt: String!): String
+  chat(chatId: String!, message: String!): String
+  toolChat(chatId: String!, message: String!): String
+}

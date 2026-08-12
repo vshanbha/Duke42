@@ -22,7 +22,7 @@ Duke42 has two sides: a **learning path** (Spring AI CLI Agent) and an **enterpr
 
 | Module | Mission | Key Features |
 |--------|---------|--------------|
-| **Backend** (`backend/`) | Enterprise demo | Vaadin Web UI + REST API + MCP client |
+| **Backend** (`backend/`) | Enterprise demo | Vaadin Web UI + REST API + GraphQL + MCP client |
 
 ### Experimental
 
@@ -39,7 +39,8 @@ Duke42 has two sides: a **learning path** (Spring AI CLI Agent) and an **enterpr
 - **Enterprise patterns**: Spring AI, advisors, tool calling, memory
 - **Web UI**: Vaadin chat interface for enterprise demos
 - **REST API**: For JavaScript/React developers
-- **Tested**: 32 tests (31 unit + 1 integration)
+- **GraphQL**: Flexible query layer for JS/React clients
+- **Tested**: 43 tests (31 unit + 2 integration + 10 e2e)
 
 ---
 
