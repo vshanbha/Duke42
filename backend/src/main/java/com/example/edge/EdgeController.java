@@ -10,9 +10,11 @@ import org.springframework.web.bind.annotation.*;
 class EdgeController {
 
     private final ChatClient chatClient;
+    private final ChatClient chatClientWithMemory;
 
-    EdgeController(ChatClient chatClient) {
+    EdgeController(ChatClient chatClient, ChatClient chatClientWithMemory) {
         this.chatClient = chatClient;
+        this.chatClientWithMemory = chatClientWithMemory;
     }
 
     @PostMapping(value = "/infer", consumes = MediaType.TEXT_PLAIN_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
@@ -32,7 +34,7 @@ class EdgeController {
             return "User ID cannot be empty.";
         }
 
-        return chatClient.prompt()
+        return chatClientWithMemory.prompt()
             .user(message)
             .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, chatId))
             .call()
@@ -48,7 +50,7 @@ class EdgeController {
             return "User ID cannot be empty.";
         }
 
-        return chatClient.prompt()
+        return chatClientWithMemory.prompt()
             .user(message)
             .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, chatId + "-tools"))
             .call()
