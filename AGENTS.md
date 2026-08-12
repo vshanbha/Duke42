@@ -20,7 +20,7 @@ cd polyglot && java -jar target/polyglot-runner.jar  # Polyglot MCP server (port
 # CLI Agent tests (31 tests)
 cd spring-ai-cli-agent && mvn test
 
-# Backend tests (1 test)
+# Backend tests (6 tests: 2 unit + 4 e2e)
 cd backend && mvn test
 
 # Run all tests in a module
@@ -29,11 +29,11 @@ mvn test
 
 ## Module Structure
 
-| Module | Purpose | Port | Key Notes |
-|--------|---------|------|-----------|
-| `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | Terminal REPL, 31 tests |
-| `backend/` | Enterprise demo (Vaadin + REST + MCP) | 8080 | Web UI + REST API |
-| `polyglot/` | GraalVM Python integration (MCP server) | 9000 | Experimental |
+| Module | Purpose | Port | Tests |
+|--------|---------|------|-------|
+| `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | 31 (unit + integration) |
+| `backend/` | Enterprise demo (Vaadin + REST + MCP) | 8080 | 6 (unit + e2e) |
+| `polyglot/` | GraalVM Python integration (MCP server) | 9000 | 3 (integration) |
 
 ## Critical Quirks
 
@@ -53,7 +53,8 @@ mvn test
 
 ### Test Dependencies
 
-- Backend tests use `@SpringBootTest` with Mockito
+- Backend unit tests use `@SpringBootTest` with Mockito
+- Backend e2e tests start jar as real process, test with Java HTTP client
 - Each test generates unique `chatId` (UUID) for isolation
 - Tests expect Ollama running locally with `lfm2.5` model
 - Spring AI CLI Agent tests use JUnit 5 + AssertJ + Mockito (no Ollama required)
@@ -72,14 +73,32 @@ mvn test
 3. **Polyglot build order**: Build polyglot module before running backend with MCP
 4. **Port conflicts**: CLI agent runs on 8081, backend on 8080
 5. **Module isolation**: Each module has its own `pom.xml` - run commands from module directory
+6. **Vaadin frontend**: Requires Node.js for dev mode; use `vaadin.productionMode=true` for tests
 
 ## Code Conventions
 
 - Java 17+ features (records, sealed classes, pattern matching)
 - Spring Boot dependency injection (CDI)
-- JUnit 5 + AssertJ for testing
+- JUnit 5 + AssertJ for unit tests
+- Java HTTP client for e2e tests (no browser needed)
 - Maven Surefire for test execution
 - Vaadin for web UI (backend module only)
+
+## Agent Rules
+
+### After Major Feature Changes
+
+After completing any significant code change (new feature, refactor, bug fix):
+
+1. **Add tests**: Unit tests for each new class/method. E2E tests for new endpoints or workflows.
+2. **Update documentation**: README.md, TUTORIAL.md, BLUEPRINT-CLI-Agent.md, AGENTS.md — all must reflect current state.
+3. **Run all tests**: `mvn test` in each module. All must pass before commit.
+4. **Commit with conventional commit message**: `feat:`, `fix:`, `test:`, `docs:`, etc.
+
+### Worklog
+
+After each session, add an entry to `worklog.md` documenting what was done.
+Use the `/worklog` command to generate the entry.
 
 ## Software Factory Patterns (Adopted from softwareaifactory.sh)
 
