@@ -1,23 +1,23 @@
 package com.example.edge.ui;
 
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
+import com.example.edge.ChatClients;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 @Service
 class ChatService {
 
-    private final ChatClient chatClient;
+    private final ChatClients chatClients;
 
-    ChatService(ChatClient chatClient) {
-        this.chatClient = chatClient;
+    ChatService(ChatClients chatClients) {
+        this.chatClients = chatClients;
     }
 
     String chat(String conversationId, String message) {
-        return chatClient.prompt()
-            .user(message)
-            .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
-            .call()
-            .content();
+        return chatClients.chat(conversationId, message);
+    }
+
+    Flux<String> chatStream(String conversationId, String message) {
+        return chatClients.chatStream(conversationId, message);
     }
 }

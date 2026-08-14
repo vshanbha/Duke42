@@ -33,12 +33,15 @@ class ChatLoop implements CommandLineRunner {
                 }
 
                 try {
-                    String response = chatClient.prompt()
+                    System.out.print("\nAI: ");
+                    chatClient.prompt()
                         .user(input)
                         .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "session-1"))
-                        .call()
-                        .content();
-                    System.out.println("\nAI: " + response + "\n");
+                        .stream()
+                        .content()
+                        .doOnNext(System.out::print)
+                        .blockLast();
+                    System.out.println("\n");
                 } catch (Exception e) {
                     System.out.println("\n[Error] " + e.getMessage() + "\n");
                 }

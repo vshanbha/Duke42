@@ -31,7 +31,6 @@
   <modules>
     <module>polyglot</module>
     <module>backend</module>
-    <module>ui</module>
     <module>spring-ai-cli-agent</module>
   </modules>
   <profiles>

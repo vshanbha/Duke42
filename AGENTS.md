@@ -20,8 +20,11 @@ cd polyglot && java -jar target/polyglot-runner.jar  # Polyglot MCP server (port
 # CLI Agent tests (31 tests)
 cd spring-ai-cli-agent && mvn test
 
-# Backend tests (12 tests: 6 unit + 4 e2e + 2 GraphQL)
+# Backend tests (12 tests: 8 unit + 4 e2e; MCP integration test optional)
 cd backend && mvn test
+
+# MCP integration test (requires polyglot on port 9000)
+cd backend && mvn test -Dtest=McpIntegrationTest -Dmcp.integration=true
 
 # Run all tests in a module
 mvn test
@@ -32,8 +35,9 @@ mvn test
 | Module | Purpose | Port | Tests |
 |--------|---------|------|-------|
 | `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | 31 (unit + integration) |
-| `backend/` | Enterprise demo (Vaadin + REST + GraphQL + MCP) | 8080 | 12 (unit + e2e + GraphQL) |
+| `backend/` | Enterprise demo (Vaadin + REST + GraphQL + MCP) | 8080 | 12 (8 unit + 4 e2e) |
 | `polyglot/` | GraalVM Python integration (MCP server) | 9000 | 3 (integration) |
+| `ui/` | Legacy JavaFX desktop client (optional, not in parent build) | — | — |
 
 ## Critical Quirks
 
@@ -43,7 +47,8 @@ mvn test
 - **MCP config is disabled by default** in `backend/src/main/resources/application.yaml`
 - To enable MCP: set `spring.ai.mcp.client.enabled=true` in application.yaml
 - **Unit tests run without MCP by default** - ensures tests work without external dependencies
-- For integration tests with MCP: start polyglot module first (`java -jar target/polyglot-runner.jar`)
+- For integration tests with MCP: start polyglot module first, then run with `-Dmcp.integration=true`
+- CI installs Ollama and pulls `lfm2.5` for e2e tests
 
 ### GraalVM Polyglot Issues
 

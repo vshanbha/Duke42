@@ -3,6 +3,7 @@ package com.example.edge;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 @Service
 public class ChatClients {
@@ -41,6 +42,17 @@ public class ChatClients {
             .user(message)
             .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, chatId + "-tools"))
             .call()
+            .content();
+    }
+
+    public Flux<String> chatStream(String chatId, String message) {
+        if (chatId == null || chatId.trim().isEmpty()) {
+            return Flux.error(new IllegalArgumentException("User ID cannot be empty."));
+        }
+        return chatClient.prompt()
+            .user(message)
+            .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, chatId))
+            .stream()
             .content();
     }
 }

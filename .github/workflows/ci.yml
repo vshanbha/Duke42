@@ -20,6 +20,18 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
+    - name: Install Ollama
+      run: curl -fsSL https://ollama.com/install.sh | sh
+
+    - name: Start Ollama and pull model
+      run: |
+        ollama serve &
+        for i in $(seq 1 30); do
+          curl -sf http://localhost:11434/api/tags && break
+          sleep 2
+        done
+        ollama pull lfm2.5
+
     - name: Build CLI Agent
       run: cd spring-ai-cli-agent && mvn clean compile -q
 
@@ -30,12 +42,13 @@ jobs:
       run: cd backend && mvn clean compile -q
 
     - name: Test Backend (unit only)
-      run: cd backend && mvn test -Dtest='!*E2ETest' -q
+      run: cd backend && mvn test -Dtest='!*E2ETest,!*McpIntegrationTest' -q
 
     - name: Build Backend JAR
       run: cd backend && mvn clean package -DskipTests -q
 
     - name: Test Backend E2E
       run: cd backend && mvn test -Dtest=E2ETest -q
-      env:
-        OLLAMA_BASE_URL: http://localhost:11434
+
+    - name: Build Polyglot
+      run: cd polyglot && mvn clean package -DskipTests -q

@@ -2,6 +2,7 @@ package com.example.cliai.cli;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
+import reactor.core.publisher.Flux;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -54,16 +55,16 @@ class ChatLoopTest {
     }
 
     @Test
-    void shouldCallChatClientOnUserInput() {
+    void shouldStreamChatClientResponseOnUserInput() {
         ChatClient chatClient = mock(ChatClient.class);
         ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
-        ChatClient.CallResponseSpec responseSpec = mock(ChatClient.CallResponseSpec.class);
+        ChatClient.StreamResponseSpec streamSpec = mock(ChatClient.StreamResponseSpec.class);
 
         when(chatClient.prompt()).thenReturn(requestSpec);
         when(requestSpec.user(any(String.class))).thenReturn(requestSpec);
         when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn("AI response");
+        when(requestSpec.stream()).thenReturn(streamSpec);
+        when(streamSpec.content()).thenReturn(Flux.just("AI", " response"));
 
         ChatLoop chatLoop = new ChatLoop(chatClient);
 
@@ -76,8 +77,8 @@ class ChatLoopTest {
 
             verify(chatClient).prompt();
             verify(requestSpec).user("Hello");
-            verify(requestSpec).call();
-            verify(responseSpec).content();
+            verify(requestSpec).stream();
+            verify(streamSpec).content();
         } finally {
             System.setIn(originalIn);
         }
