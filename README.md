@@ -29,6 +29,7 @@ Duke42 has two sides: a **learning path** (Spring AI CLI Agent) and an **enterpr
 | Module | Mission | Status |
 |--------|---------|--------|
 | **Polyglot** (`polyglot/`) | MCP server | Quarkus + GraalPy sentiment analysis |
+| **UI** (`ui/`) | Legacy desktop client | JavaFX — optional, not in default build |
 
 ---
 
@@ -40,7 +41,7 @@ Duke42 has two sides: a **learning path** (Spring AI CLI Agent) and an **enterpr
 - **Web UI**: Vaadin chat interface for enterprise demos
 - **REST API**: For JavaScript/React developers
 - **GraphQL**: Flexible query layer for JS/React clients
-- **Tested**: 43 tests (31 unit + 2 integration + 10 e2e)
+- **Tested**: 46 tests (31 CLI + 15 backend)
 
 ---
 
@@ -103,7 +104,7 @@ mvn spring-boot:run
 # CLI Agent tests (31 tests)
 cd spring-ai-cli-agent && mvn test
 
-# Backend tests (1 test)
+# Backend tests (12 tests: unit + GraphQL + e2e)
 cd backend && mvn test
 ```
 
@@ -121,7 +122,8 @@ cd backend && mvn test
 | 6 | Logging Advisor | Debugging AI calls |
 | 7 | Packaging | Executable jar |
 | 8 | Unit Testing | JUnit 5, AssertJ, Mockito |
-| 9 | Enterprise Backend (Optional) | Vaadin Web UI + REST API |
+| 9 | Enterprise Backend (Optional) | Vaadin Web UI + REST API + GraphQL |
+| 10 | Streaming Responses | Real-time token output in CLI and Vaadin |
 
 **Full tutorial**: [TUTORIAL.md](TUTORIAL.md)
 

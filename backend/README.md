@@ -1,59 +1,78 @@
-# backend-ollama
+# Duke42 Backend
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+Spring Boot enterprise demo: Vaadin web UI, REST API, GraphQL, and optional MCP client.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+## Features
 
-## Running the application in dev mode
+| Layer | Endpoint | Description |
+|-------|----------|-------------|
+| Vaadin UI | http://localhost:8080 | Browser chat with streaming responses |
+| REST | `/edge/infer`, `/edge/chat/{id}`, `/edge/toolChat/{id}` | For JavaScript/React clients |
+| GraphQL | `/graphql` | Queries and mutations mirroring REST |
+| Swagger | `/swagger-ui.html` | OpenAPI documentation |
 
-You can run your application in dev mode that enables live coding using:
+## Quick Start
 
-```shell script
-./mvnw quarkus:dev
+```bash
+# Prerequisites: Java 17+, Maven, Ollama with lfm2.5
+ollama pull lfm2.5
+
+cd backend
+mvn spring-boot:run
+# Open http://localhost:8080
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+## REST API Examples
 
-## Packaging and running the application
+```bash
+# Single-shot inference
+curl -X POST http://localhost:8080/edge/infer \
+  -H "Content-Type: text/plain" \
+  -d "Hello"
 
-The application can be packaged using:
+# Chat with memory
+curl -X POST "http://localhost:8080/edge/chat/user-1?message=My%20name%20is%20Alice" \
+  -H "Content-Type: text/plain"
 
-```shell script
-./mvnw package
+# Chat with MCP tools (requires polyglot server + MCP enabled)
+curl -X POST "http://localhost:8080/edge/toolChat/user-1?message=Analyze%20sentiment%3A%20I%20love%20Java" \
+  -H "Content-Type: text/plain"
 ```
 
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
+## GraphQL
 
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
+Open `/graphiql?path=/graphql` in the browser, or query programmatically:
 
-If you want to build an _über-jar_, execute the following command:
-
-```shell script
-./mvnw package -Dquarkus.package.jar.type=uber-jar
+```graphql
+query {
+  chat(chatId: "user-1", message: "Hello")
+}
 ```
 
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
+## Enable MCP (Polyglot Sentiment Server)
 
-## Creating a native executable
+1. Start polyglot: `cd polyglot && mvn package -DskipTests && java -jar target/polyglot-runner.jar`
+2. Set `spring.ai.mcp.client.enabled=true` in `src/main/resources/application.yaml`
+3. Restart backend
 
-You can create a native executable using:
+## Tests
 
-```shell script
-./mvnw package -Dnative
+```bash
+# Unit + GraphQL tests (no Ollama required)
+mvn test -Dtest='!*E2ETest,!*McpIntegrationTest'
+
+# E2E tests (requires Ollama running)
+mvn test -Dtest=E2ETest
+
+# MCP integration (requires polyglot on port 9000)
+mvn test -Dtest=McpIntegrationTest -Dmcp.integration=true
 ```
 
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
+## Docker
 
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
+```bash
+# From repo root
+docker compose up --build
 ```
 
-You can then execute your native executable with: `./target/backend-ollama-1.0.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
-
-## Related Guides
-
-- Qute ([guide](https://quarkus.io/guides/qute)): Offer templating support for web, email, etc in a build time, type-safe way
-- LangChain4j Ollama ([guide](https://docs.quarkiverse.io/quarkus-langchain4j/dev/index.html)): Provides the basic integration of Ollama with LangChain4j
+Ollama must be reachable from the container (default: `host.docker.internal:11434`).

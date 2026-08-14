@@ -1062,6 +1062,26 @@ curl -X POST "http://localhost:8080/edge/chat/USER-123?message=What%27s%20my%20n
   -H "Content-Type: text/plain"
 ```
 
+### GraphQL (for React/Apollo clients)
+
+The backend also exposes GraphQL at `/graphql`. Use GraphiQL at `/graphiql?path=/graphql` to explore.
+
+```graphql
+query {
+  infer(prompt: "Hello")
+}
+
+query {
+  chat(chatId: "USER-123", message: "My name is Alice")
+}
+
+mutation {
+  toolChat(chatId: "USER-123", message: "Analyze sentiment: I love Java")
+}
+```
+
+Schema: [`backend/src/main/resources/graphql/schema.graphqls`](backend/src/main/resources/graphql/schema.graphqls)
+
 ### Enable MCP (connect to polyglot)
 
 1. Start the polyglot MCP server:
@@ -1081,6 +1101,64 @@ spring:
 ```
 
 3. Restart the backend. The AI can now call the sentiment analysis tool.
+
+---
+
+## Step 10: Streaming Responses
+
+By default, ChatClient `.call()` waits for the full response. Streaming shows tokens as they arrive — better UX in both the CLI and Vaadin UI.
+
+### CLI Agent
+
+Replace `.call().content()` with `.stream().content()`:
+
+```java
+System.out.print("\nAI: ");
+chatClient.prompt()
+    .user(input)
+    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "session-1"))
+    .stream()
+    .content()
+    .doOnNext(System.out::print)
+    .blockLast();
+System.out.println();
+```
+
+Run `mvn spring-boot:run` and watch tokens appear incrementally.
+
+### Vaadin Web UI
+
+In the backend, expose a streaming method on `ChatClients`:
+
+```java
+public Flux<String> chatStream(String chatId, String message) {
+    return chatClient.prompt()
+        .user(message)
+        .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, chatId))
+        .stream()
+        .content();
+}
+```
+
+In `ChatView`, run the stream on a background thread and update the UI with `UI.access()` on each chunk:
+
+```java
+CompletableFuture.runAsync(() -> {
+    StringBuilder response = new StringBuilder();
+    chatService.chatStream(conversationId, message)
+        .doOnNext(chunk -> {
+            response.append(chunk);
+            ui.access(() -> aiMessage.setText("AI: " + response));
+        })
+        .blockLast();
+});
+```
+
+### Why Streaming Matters
+
+- **Perceived latency** drops — users see output immediately
+- **Long responses** feel interactive instead of frozen
+- **Same advisors and tools** work with `.stream()` as with `.call()`
 
 ---
 

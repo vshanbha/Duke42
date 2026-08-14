@@ -1,6 +1,7 @@
 package com.example.edge.ui;
 
 import com.vaadin.flow.component.Key;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.Div;
@@ -12,6 +13,7 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.Route;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Route("")
 class ChatView extends VerticalLayout {
@@ -20,6 +22,7 @@ class ChatView extends VerticalLayout {
     private final String conversationId = UUID.randomUUID().toString();
     private final Div messages = new Div();
     private final TextField input = new TextField();
+    private final Button sendButton = new Button("Send");
 
     ChatView(ChatService chatService) {
         this.chatService = chatService;
@@ -28,23 +31,19 @@ class ChatView extends VerticalLayout {
         setPadding(true);
         setSpacing(false);
 
-        // Header
         Paragraph header = new Paragraph("Duke42 — Spring AI Chat");
         header.getStyle().set("font-size", "1.5em");
         header.getStyle().set("font-weight", "bold");
         add(header);
 
-        // Messages area
         messages.setWidthFull();
         messages.setHeightFull();
         add(messages);
 
-        // Input area
         input.setWidthFull();
         input.setPlaceholder("Type your message...");
         input.addKeyDownListener(Key.ENTER, e -> sendMessage());
 
-        Button sendButton = new Button("Send");
         sendButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         sendButton.addClickListener(e -> sendMessage());
 
@@ -55,7 +54,6 @@ class ChatView extends VerticalLayout {
 
         add(inputLayout);
 
-        // Welcome message
         addMessage("AI", "Hello! I'm Duke42. Ask me anything.");
     }
 
@@ -65,14 +63,32 @@ class ChatView extends VerticalLayout {
 
         addMessage("You", message);
         input.clear();
+        setInputEnabled(false);
 
-        // Run LLM call in background
-        try {
-            String response = chatService.chat(conversationId, message);
-            addMessage("AI", response);
-        } catch (Exception e) {
-            addMessage("Error", e.getMessage());
-        }
+        UI ui = UI.getCurrent();
+        Paragraph aiMessage = new Paragraph("AI: ");
+        aiMessage.getStyle().set("font-size", "0.9em");
+        messages.add(aiMessage);
+
+        CompletableFuture.runAsync(() -> {
+            StringBuilder response = new StringBuilder();
+            chatService.chatStream(conversationId, message)
+                .doOnNext(chunk -> {
+                    response.append(chunk);
+                    ui.access(() -> aiMessage.setText("AI: " + response));
+                })
+                .doOnError(error -> ui.access(() -> {
+                    setInputEnabled(true);
+                    aiMessage.setText("Error: " + error.getMessage());
+                }))
+                .doOnComplete(() -> ui.access(() -> setInputEnabled(true)))
+                .blockLast();
+        });
+    }
+
+    private void setInputEnabled(boolean enabled) {
+        input.setEnabled(enabled);
+        sendButton.setEnabled(enabled);
     }
 
     private void addMessage(String sender, String text) {
