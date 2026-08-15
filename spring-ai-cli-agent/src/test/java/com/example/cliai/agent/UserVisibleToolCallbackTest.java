@@ -27,6 +27,20 @@ class UserVisibleToolCallbackTest {
     }
 
     @Test
+    void suppliesQuestionTextWhenModelSendsOnlyHeaderAndOptions() throws Exception {
+        AtomicReference<String> received = new AtomicReference<>();
+        ToolCallback delegate = new StubToolCallback("AskUserQuestionTool", received);
+        UserVisibleToolCallback callback = new UserVisibleToolCallback(delegate);
+
+        callback.call("""
+            {"header":"Project type","options":[],"multiSelect":false}
+            """);
+
+        var question = new ObjectMapper().readTree(received.get()).path("questions").get(0);
+        assertThat(question.path("question").asText()).isEqualTo("Project type. Please choose an option.");
+    }
+
+    @Test
     void leavesNonAskUserToolArgumentsUnchanged() {
         AtomicReference<String> received = new AtomicReference<>();
         ToolCallback delegate = new StubToolCallback("CalculatorTool", received);

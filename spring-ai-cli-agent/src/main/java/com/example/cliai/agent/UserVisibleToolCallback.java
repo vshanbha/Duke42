@@ -45,10 +45,15 @@ final class UserVisibleToolCallback implements ToolCallback {
         }
         try {
             JsonNode root = objectMapper.readTree(arguments);
-            if (root.isObject() && root.has("question") && !root.has("questions")) {
+            if (root.isObject() && root.has("options") && !root.has("questions")) {
+                ObjectNode question = (ObjectNode) root.deepCopy();
+                if (!question.has("question")) {
+                    String header = question.path("header").asText("Please choose an option");
+                    question.put("question", header + ". Please choose an option.");
+                }
                 ObjectNode wrapped = objectMapper.createObjectNode();
                 ArrayNode questions = wrapped.putArray("questions");
-                questions.add(root);
+                questions.add(question);
                 return objectMapper.writeValueAsString(wrapped);
             }
         }
