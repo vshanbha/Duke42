@@ -62,6 +62,9 @@ mvn test -Devals=true -Dtest=ToolCallingEvalTest
 
 # Run only the AskUserQuestionTool eval
 mvn test -Devals=true -Dtest=ToolCallingEvalTest#clarificationPromptMustExecuteAskUserQuestionTool
+
+# Run the ambiguity eval without naming the tool in the prompt
+mvn test -Devals=true -Dtest=ToolCallingEvalTest#sufficientlyAmbiguousPromptShouldTriggerClarificationTool
 ```
 
 The evaluations exit with code `0` when the model invokes the expected tool and
