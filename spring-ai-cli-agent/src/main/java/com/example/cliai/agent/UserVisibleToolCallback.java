@@ -4,11 +4,16 @@ import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /** Adds a concise, user-visible trace around a tool invocation. */
 final class UserVisibleToolCallback implements ToolCallback {
 
     private final ToolCallback delegate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     UserVisibleToolCallback(ToolCallback delegate) {
         this.delegate = delegate;
@@ -26,12 +31,31 @@ final class UserVisibleToolCallback implements ToolCallback {
 
     @Override
     public String call(String arguments) {
-        return invoke(arguments, () -> delegate.call(arguments));
+        return invoke(arguments, () -> delegate.call(normalizeArguments(arguments)));
     }
 
     @Override
     public String call(String arguments, ToolContext context) {
-        return invoke(arguments, () -> delegate.call(arguments, context));
+        return invoke(arguments, () -> delegate.call(normalizeArguments(arguments), context));
+    }
+
+    private String normalizeArguments(String arguments) {
+        if (!getToolDefinition().name().toLowerCase().contains("askuserquestion")) {
+            return arguments;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(arguments);
+            if (root.isObject() && root.has("question") && !root.has("questions")) {
+                ObjectNode wrapped = objectMapper.createObjectNode();
+                ArrayNode questions = wrapped.putArray("questions");
+                questions.add(root);
+                return objectMapper.writeValueAsString(wrapped);
+            }
+        }
+        catch (Exception ignored) {
+            // Preserve the original payload so Spring AI reports the normal tool error.
+        }
+        return arguments;
     }
 
     private String invoke(String arguments, java.util.function.Supplier<String> invocation) {
