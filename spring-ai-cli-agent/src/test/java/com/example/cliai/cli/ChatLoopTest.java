@@ -5,6 +5,8 @@ import org.springframework.ai.chat.client.ChatClient;
 import reactor.core.publisher.Flux;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
@@ -69,6 +71,30 @@ class ChatLoopTest {
             verify(chatClient, never()).prompt();
         } finally {
             System.setIn(originalIn);
+        }
+    }
+
+    @Test
+    void shouldHandleSlashCommandsWithoutCallingModel() {
+        ChatClient chatClient = mock(ChatClient.class);
+        ChatLoop chatLoop = new ChatLoop(chatClient);
+        InputStream originalIn = System.in;
+        PrintStream originalOut = System.out;
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try {
+            System.setIn(new ByteArrayInputStream("/help\n/tools\n/clear\n/exit\n"
+                .getBytes(StandardCharsets.UTF_8)));
+            System.setOut(new PrintStream(output));
+
+            chatLoop.run();
+
+            String text = output.toString(StandardCharsets.UTF_8);
+            org.assertj.core.api.Assertions.assertThat(text)
+                .contains("/help", "CalculatorTool", "Conversation cleared.", "Goodbye!");
+            verify(chatClient, never()).prompt();
+        } finally {
+            System.setIn(originalIn);
+            System.setOut(originalOut);
         }
     }
 
