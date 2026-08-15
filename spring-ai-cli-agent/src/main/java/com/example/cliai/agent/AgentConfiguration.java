@@ -26,8 +26,12 @@ class AgentConfiguration {
             .maxMessages(20)
             .build();
 
+        Object askUserQuestionTool = AskUserQuestionTool.builder()
+            .questionHandler(new CommandLineQuestionHandler())
+            .build();
+
         ToolCallback[] visibleTools = java.util.Arrays.stream(
-                ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool()))
+                ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
             .map(UserVisibleToolCallback::new)
             .toArray(ToolCallback[]::new);
 
@@ -42,11 +46,6 @@ class AgentConfiguration {
                 description. Example:
                 {"questions":[{"question":"Which option do you prefer?","header":"Preference","options":[{"label":"Option A","description":"First choice"},{"label":"Option B","description":"Second choice"}],"multiSelect":false}]}
                 """)
-            .defaultTools(
-                AskUserQuestionTool.builder()
-                    .questionHandler(new CommandLineQuestionHandler())
-                    .build()
-            )
             .defaultToolCallbacks(visibleTools)
             .defaultAdvisors(
                 new SimpleLoggerAdvisor(),
