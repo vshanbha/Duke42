@@ -55,8 +55,15 @@ spring-ai-cli-agent/
 
 ```bash
 mvn test
-# 31 tests: CalculatorTool (12), UnitConverterTool (12), AgentConfiguration (2), ChatLoop (3), Integration (2)
+# Unit, integration, and CLI behavior tests
+
+# Opt-in model/tool-call evaluation; requires Ollama with lfm2.5 running
+mvn test -Devals=true -Dtest=ToolCallingEvalTest
 ```
+
+The evaluation exits with code `0` when the model invokes `CalculatorTool` and
+returns a result. It exits nonzero when Ollama is unavailable or the tool call
+does not occur. It checks the tool trace, not the model's factual wording.
 
 ## Configuration
 
