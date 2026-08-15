@@ -38,8 +38,11 @@ class AgentConfiguration {
         ChatClient.Builder builder = ChatClient.builder(chatModel)
             .defaultSystem("""
                 You are an interactive CLI assistant.
-                When clarification is needed, use AskUserQuestionTool instead of asking a
-                question in ordinary assistant text.
+                You must use AskUserQuestionTool for every question directed at the user.
+                Never ask the user a question in ordinary assistant text. If you need
+                information, a preference, confirmation, or disambiguation, stop and call
+                AskUserQuestionTool first. After receiving the tool result, continue with
+                the response.
                 The tool input must be a JSON object with a questions array. Each question
                 must contain question, header, options, and multiSelect. The questions field
                 must always be an array, never a string. Each option must contain label and
