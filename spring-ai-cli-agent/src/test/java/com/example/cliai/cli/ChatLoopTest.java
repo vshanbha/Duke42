@@ -55,6 +55,24 @@ class ChatLoopTest {
     }
 
     @Test
+    void shouldExitCleanlyWhenInputEnds() {
+        ChatClient chatClient = mock(ChatClient.class);
+
+        ChatLoop chatLoop = new ChatLoop(chatClient);
+
+        InputStream originalIn = System.in;
+        try {
+            System.setIn(new ByteArrayInputStream(new byte[0]));
+
+            chatLoop.run();
+
+            verify(chatClient, never()).prompt();
+        } finally {
+            System.setIn(originalIn);
+        }
+    }
+
+    @Test
     void shouldStreamChatClientResponseOnUserInput() {
         ChatClient chatClient = mock(ChatClient.class);
         ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);

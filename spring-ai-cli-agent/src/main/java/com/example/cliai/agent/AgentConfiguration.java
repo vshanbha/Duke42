@@ -11,6 +11,8 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.support.ToolCallbacks;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,14 +26,18 @@ class AgentConfiguration {
             .maxMessages(20)
             .build();
 
+        ToolCallback[] visibleTools = java.util.Arrays.stream(
+                ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool()))
+            .map(UserVisibleToolCallback::new)
+            .toArray(ToolCallback[]::new);
+
         ChatClient.Builder builder = ChatClient.builder(chatModel)
             .defaultTools(
                 AskUserQuestionTool.builder()
                     .questionHandler(new CommandLineQuestionHandler())
-                    .build(),
-                new CalculatorTool(),
-                new UnitConverterTool()
+                    .build()
             )
+            .defaultToolCallbacks(visibleTools)
             .defaultAdvisors(
                 new SimpleLoggerAdvisor(),
                 MessageChatMemoryAdvisor.builder(chatMemory).build()
