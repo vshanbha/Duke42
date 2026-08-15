@@ -39,7 +39,7 @@ class ChatClientIntegrationTest {
         String conversationId = "memory-test-" + UUID.randomUUID();
 
         String response1 = chatClient.prompt()
-            .user("My name is TestUser123. Reply with OK.")
+            .user("Remember this exact fact for the next turn: my name is TestUser123. Reply only with OK.")
             .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
             .call()
             .content();
@@ -48,7 +48,7 @@ class ChatClientIntegrationTest {
         System.out.println("Turn 1: " + response1);
 
         String response2 = chatClient.prompt()
-            .user("What is my name?")
+            .user("Retrieve the name from the previous turn. Reply with only that exact name and no other words.")
             .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
             .call()
             .content();
