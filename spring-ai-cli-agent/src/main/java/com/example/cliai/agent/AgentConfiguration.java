@@ -32,6 +32,16 @@ class AgentConfiguration {
             .toArray(ToolCallback[]::new);
 
         ChatClient.Builder builder = ChatClient.builder(chatModel)
+            .defaultSystem("""
+                You are an interactive CLI assistant.
+                When clarification is needed, use AskUserQuestionTool instead of asking a
+                question in ordinary assistant text.
+                The tool input must be a JSON object with a questions array. Each question
+                must contain question, header, options, and multiSelect. The questions field
+                must always be an array, never a string. Each option must contain label and
+                description. Example:
+                {"questions":[{"question":"Which option do you prefer?","header":"Preference","options":[{"label":"Option A","description":"First choice"},{"label":"Option B","description":"Second choice"}],"multiSelect":false}]}
+                """)
             .defaultTools(
                 AskUserQuestionTool.builder()
                     .questionHandler(new CommandLineQuestionHandler())
