@@ -59,11 +59,14 @@ mvn test
 
 # Opt-in model/tool-call evaluation; requires Ollama with lfm2.5 running
 mvn test -Devals=true -Dtest=ToolCallingEvalTest
+
+# Run only the AskUserQuestionTool eval
+mvn test -Devals=true -Dtest=ToolCallingEvalTest#clarificationPromptMustExecuteAskUserQuestionTool
 ```
 
-The evaluation exits with code `0` when the model invokes `CalculatorTool` and
-returns a result. It exits nonzero when Ollama is unavailable or the tool call
-does not occur. It checks the tool trace, not the model's factual wording.
+The evaluations exit with code `0` when the model invokes the expected tool and
+returns a result. They exit nonzero when Ollama is unavailable or the tool call
+does not occur. They check the tool trace, not the model's factual wording.
 
 ## Configuration
 
