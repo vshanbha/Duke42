@@ -50,6 +50,8 @@ ollama run lfm2.5 "Say hello"
 
 ### Create the Project
 
+Spring provides a convenient tool to create project scaffolding (pom.xml directories, and some starting files) through the [Spring initializer website](https://start.spring.io/). However, we can also create the basic structure manually if needed:
+
 ```bash
 mkdir spring-ai-cli-agent
 cd spring-ai-cli-agent
@@ -132,16 +134,11 @@ mkdir -p src/test/java/com/example/cliai/cli
 
 ### 1.1 Configure Ollama
 
-Create `src/main/resources/application.yaml`:
+Create `src/main/resources/application.properties`:
 
-```yaml
-spring:
-  ai:
-    ollama:
-      base-url: http://localhost:11434
-      chat:
-        options:
-          model: lfm2.5
+```properties
+spring.ai.ollama.base-url=http://localhost:11434
+spring.ai.ollama.chat.options.model=lfm2.5
 ```
 
 ### 1.2 Create the Entry Point
@@ -164,7 +161,7 @@ public class Application {
 
 ### 1.3 Create the ChatClient Bean
 
-Spring Boot auto-configures `ChatModel` from your `application.yaml`. We wrap it in a `ChatClient` bean.
+Spring Boot auto-configures `ChatModel` from your `application.properties`. We wrap it in a `ChatClient` bean.
 
 Create `src/main/java/com/example/cliai/agent/AgentConfiguration.java`:
 
@@ -877,7 +874,7 @@ spring-ai-cli-agent/
 │   └── cli/
 │       └── ChatLoop.java
 ├── src/main/resources/
-│   └── application.yaml
+│   └── application.properties
 └── src/test/java/com/example/cliai/
     ├── agent/
     │   ├── AgentConfigurationTest.java
@@ -1091,13 +1088,9 @@ mvn clean install
 java -jar target/polyglot-runner.jar
 ```
 
-2. Enable MCP in `backend/src/main/resources/application.yaml`:
-```yaml
-spring:
-  ai:
-    mcp:
-      client:
-        enabled: true
+2. Enable MCP in `backend/src/main/resources/application.properties`:
+```properties
+spring.ai.mcp.client.enabled=true
 ```
 
 3. Restart the backend. The AI can now call the sentiment analysis tool.
