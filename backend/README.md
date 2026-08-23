@@ -58,11 +58,12 @@ query {
 ## Tests
 
 ```bash
-# Unit + GraphQL tests (no Ollama required)
-mvn test -Dtest='!*E2ETest,!*McpIntegrationTest'
+# Everything: unit + GraphQL tests, package, then E2E via failsafe
+# (E2E requires Ollama running; runs after packaging against the real jar)
+mvn clean verify
 
-# E2E tests (requires Ollama running)
-mvn test -Dtest=E2ETest
+# Unit + GraphQL tests only (no Ollama required)
+mvn test
 
 # MCP integration (requires polyglot on port 9000)
 mvn test -Dtest=McpIntegrationTest -Dmcp.integration=true

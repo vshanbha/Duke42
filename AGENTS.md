@@ -17,11 +17,14 @@ cd polyglot && java -jar target/polyglot-runner.jar  # Polyglot MCP server (port
 ### Test Commands
 
 ```bash
-# CLI Agent tests (31 tests)
+# CLI Agent tests (39 tests)
 cd spring-ai-cli-agent && mvn test
 
-# Backend tests (12 tests: 8 unit + 4 e2e; MCP integration test optional)
+# Backend: unit + GraphQL tests only (10 tests; no Ollama required)
 cd backend && mvn test
+
+# Backend full verification: unit tests, package, then E2E via failsafe (4 e2e; requires Ollama)
+cd backend && mvn clean verify
 
 # MCP integration test (requires polyglot on port 9000)
 cd backend && mvn test -Dtest=McpIntegrationTest -Dmcp.integration=true
@@ -34,8 +37,8 @@ mvn test
 
 | Module | Purpose | Port | Tests |
 |--------|---------|------|-------|
-| `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | 31 (unit + integration) |
-| `backend/` | Enterprise demo (Vaadin + REST + GraphQL + MCP) | 8080 | 12 (8 unit + 4 e2e) |
+| `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | 39 (unit + integration) |
+| `backend/` | Enterprise demo (Vaadin + REST + GraphQL + MCP) | 8080 | 14 (10 unit + 4 e2e via failsafe) |
 | `polyglot/` | GraalVM Python integration (MCP server) | 9000 | 3 (integration) |
 | `ui/` | Legacy JavaFX desktop client (optional, not in parent build) | — | — |
 
@@ -79,6 +82,8 @@ mvn test
 4. **Port conflicts**: CLI agent runs on 8081, backend on 8080
 5. **Module isolation**: Each module has its own `pom.xml` - run commands from module directory
 6. **Vaadin frontend**: Requires Node.js for dev mode; use `vaadin.productionMode=true` for tests
+7. **Vaadin fat jar needs production mode**: `vaadin-dev` is `<optional>` and excluded from the packaged jar. Running the jar with `vaadin.productionMode=false` (the yaml default, meant for `mvn spring-boot:run`) fails with `'vaadin-dev-server' not found`. Always start the jar with `--vaadin.productionMode=true` — E2EIT does this for you
+8. **E2E tests need the packaged jar**: they run via maven-failsafe-plugin in the `verify` phase (`mvn clean verify`), never during `mvn test` — surefire would fail with "Jar not found" since packaging hasn't happened yet
 
 ## Code Conventions
 

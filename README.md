@@ -101,11 +101,14 @@ mvn spring-boot:run
 **5. Run tests**
 
 ```bash
-# CLI Agent tests (31 tests)
+# CLI Agent tests (39 tests)
 cd spring-ai-cli-agent && mvn test
 
-# Backend tests (12 tests: unit + GraphQL + e2e)
+# Backend unit + GraphQL tests only (10 tests; no Ollama required)
 cd backend && mvn test
+
+# Backend full verification: unit tests, package, then E2E (requires Ollama)
+cd backend && mvn clean verify
 ```
 
 ---
