@@ -52,7 +52,7 @@ query {
 ## Enable MCP (Polyglot Sentiment Server)
 
 1. Start polyglot: `cd polyglot && mvn package -DskipTests && java -jar target/polyglot-runner.jar`
-2. Set `spring.ai.mcp.client.enabled=true` in `src/main/resources/application.yaml`
+2. Set `spring.ai.mcp.client.enabled=true` in `src/main/resources/application.properties`
 3. Restart backend
 
 ## Tests

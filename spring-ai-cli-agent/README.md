@@ -47,7 +47,7 @@ spring-ai-cli-agent/
 │   └── cli/
 │       └── ChatLoop.java             # Terminal REPL
 ├── src/main/resources/
-│   └── application.yaml              # Ollama config
+│   └── application.properties         # Ollama config
 └── src/test/java/                    # 31 tests
 ```
 
@@ -73,16 +73,11 @@ does not occur. They check the tool trace, not the model's factual wording.
 
 ## Configuration
 
-Edit `src/main/resources/application.yaml`:
+Edit `src/main/resources/application.properties`:
 
-```yaml
-spring:
-  ai:
-    ollama:
-      base-url: http://localhost:11434
-      chat:
-        options:
-          model: lfm2.5  # or qwen2.5, llama3.1
+```properties
+spring.ai.ollama.base-url=http://localhost:11434
+spring.ai.ollama.chat.options.model=lfm2.5  # or qwen2.5, llama3.1
 ```
 
 ## How It Works

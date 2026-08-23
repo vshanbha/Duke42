@@ -47,8 +47,8 @@ mvn test
 ### MCP Integration
 
 - Backend can use Polyglot module as MCP server on port 9000
-- **MCP config is disabled by default** in `backend/src/main/resources/application.yaml`
-- To enable MCP: set `spring.ai.mcp.client.enabled=true` in application.yaml
+- **MCP config is disabled by default** in `backend/src/main/resources/application.properties`
+- To enable MCP: set `spring.ai.mcp.client.enabled=true` in application.properties
 - **Unit tests run without MCP by default** - ensures tests work without external dependencies
 - For integration tests with MCP: start polyglot module first, then run with `-Dmcp.integration=true`
 - CI installs Ollama and pulls `lfm2.5` for e2e tests
