@@ -9,18 +9,26 @@ import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * E2E tests that start the backend jar as a real process,
+ * E2E integration tests that start the backend jar as a real process,
  * test the REST API, then kill the process.
+ *
+ * Bound to the maven-failsafe-plugin and therefore run during the
+ * integration-test/verify phases, after the executable jar has been packaged.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class E2ETest {
+class E2EIT {
 
     private static final int PORT = 9099;
+    private static final Path SERVER_LOG = Paths.get("target", "e2e-server.log");
     private static Process serverProcess;
     private static HttpClient httpClient;
 
@@ -33,14 +41,18 @@ class E2ETest {
                 + "\nRun: mvn clean package -DskipTests");
         }
 
+        // The packaged fat jar excludes the optional vaadin-dev dependency, so
+        // Vaadin dev mode can never work inside it; production mode is required.
         ProcessBuilder pb = new ProcessBuilder(
             "java",
             "-jar", jarPath,
             "--server.port=" + PORT,
-            "--spring.ai.mcp.client.enabled=false"
+            "--spring.ai.mcp.client.enabled=false",
+            "--vaadin.productionMode=true"
         );
         pb.directory(new File("."));
-        pb.inheritIO();
+        pb.redirectErrorStream(true);
+        pb.redirectOutput(SERVER_LOG.toFile());
         serverProcess = pb.start();
 
         waitForServer();
@@ -64,7 +76,8 @@ class E2ETest {
         int maxRetries = 60;
         for (int i = 0; i < maxRetries; i++) {
             if (!serverProcess.isAlive()) {
-                throw new RuntimeException("Server process died during startup");
+                throw new RuntimeException(
+                    "Server process died during startup. Server log tail:\n" + tailOf(SERVER_LOG));
             }
             try {
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -79,7 +92,18 @@ class E2ETest {
             }
             TimeUnit.MILLISECONDS.sleep(500);
         }
-        throw new RuntimeException("Server did not start within " + maxRetries + " seconds");
+        throw new RuntimeException(
+            "Server did not start within " + maxRetries + " seconds. Server log tail:\n" + tailOf(SERVER_LOG));
+    }
+
+    private static String tailOf(Path logFile) {
+        try {
+            List<String> lines = Files.readAllLines(logFile);
+            int from = Math.max(0, lines.size() - 40);
+            return String.join("\n", lines.subList(from, lines.size()));
+        } catch (Exception e) {
+            return "(could not read " + logFile + ": " + e.getMessage() + ")";
+        }
     }
 
     @Test

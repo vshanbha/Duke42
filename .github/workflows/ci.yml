@@ -38,17 +38,8 @@ jobs:
     - name: Test CLI Agent
       run: cd spring-ai-cli-agent && mvn test -q
 
-    - name: Build Backend
-      run: cd backend && mvn clean compile -q
-
-    - name: Test Backend (unit only)
-      run: cd backend && mvn test -Dtest='!*E2ETest,!*McpIntegrationTest' -q
-
-    - name: Build Backend JAR
-      run: cd backend && mvn clean package -DskipTests -q
-
-    - name: Test Backend E2E
-      run: cd backend && mvn test -Dtest=E2ETest -q
+    - name: Build Backend (unit tests + package + E2E via failsafe)
+      run: cd backend && mvn clean verify -q
 
     - name: Build Polyglot
       run: cd polyglot && mvn clean package -DskipTests -q
