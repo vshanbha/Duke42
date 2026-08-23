@@ -65,7 +65,7 @@ Duke42/
 │   │       ├── ChatView.java     # Vaadin web UI
 │   │       └── ChatService.java  # Wraps ChatClient
 │   └── src/main/resources/
-│       └── application.yaml
+│       └── application.properties
 │
 ├── polyglot/                      # MCP server (Quarkus, GraalPy)
 │   └── src/main/java/com/example/
@@ -163,16 +163,11 @@ sends prompts and gets responses.
 </dependencies>
 ```
 
-`application.yaml`:
+`application.properties`:
 
-```yaml
-spring:
-  ai:
-    ollama:
-      base-url: http://localhost:11434
-      chat:
-        options:
-          model: lfm2.5
+```properties
+spring.ai.ollama.base-url=http://localhost:11434
+spring.ai.ollama.chat.options.model=lfm2.5
 ```
 
 `Application.java`:
@@ -631,16 +626,11 @@ After all 7 steps, the project has:
 </project>
 ```
 
-### `application.yaml` (complete)
+### `application.properties` (complete)
 
-```yaml
-spring:
-  ai:
-    ollama:
-      base-url: http://localhost:11434
-      chat:
-        options:
-          model: lfm2.5
+```properties
+spring.ai.ollama.base-url=http://localhost:11434
+spring.ai.ollama.chat.options.model=lfm2.5
 ```
 
 ### `AgentConfiguration.java` (complete)

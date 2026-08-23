@@ -20,7 +20,7 @@
 
 **Key Files**:
 - `pom.xml` with Spring AI BOM
-- `application.yaml` with Ollama config
+- `application.properties` with Ollama config
 - `Application.java` entry point
 - `AgentConfiguration.java` with ChatClient bean
 - `ChatLoop.java` interactive REPL
