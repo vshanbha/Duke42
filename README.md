@@ -144,7 +144,8 @@ cd backend && mvn clean verify
 ### Ollama
 
 - [Ollama Website](https://ollama.com/) — Download and install
-- [lfm2.5 Model](https://ollama.com/library/lfm2.5) — Primary model used in tutorial
+- [lfm2.5 Model](https://ollama.com/library/lfm2.5) — Primary model (5.2 GB) used in tutorial
+- Alternatives $<10$ GB with tools: [qwen3.5:9b](https://ollama.com/library/qwen3.5) (6.6 GB), [gemma4:e4b](https://ollama.com/library/gemma4) (9.6 GB) — see [ollama-model-links.md](ollama-model-links.md) (single source of truth)
 
 ### Vaadin
 

@@ -301,6 +301,8 @@ mvn spring-boot:run
 
 `AskUserQuestionTool` lets the AI ask clarifying questions mid-conversation. For example, if you say "Help me learn Spring AI," the AI might ask "What's your experience level?" before giving advice.
 
+> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. LLMs are pre-trained to clarify in plain text. Without an explicit tool-usage policy in the system prompt the model will often skip the tool and emit `What's your experience?` as assistant text — so `CommandLineQuestionHandler` never fires. The `defaultSystem` policy below forces every user-directed question through `AskUserQuestionTool` in a structured, handler-driven way. The JSON schema in the same prompt tells the model the exact shape (`{"questions":[{question,header,options:[{label,description}],multiSelect}]}`) that `CommandLineQuestionHandler` expects.
+
 ### 3.1 Add Dependency
 
 Add to `pom.xml`:
@@ -314,6 +316,8 @@ Add to `pom.xml`:
 ```
 
 ### 3.2 Update AgentConfiguration
+
+Add a `defaultSystem` prompt that *requires* clarification via the tool, then register the tool:
 
 ```java
 package com.example.cliai.agent;
@@ -338,6 +342,19 @@ class AgentConfiguration {
             .build();
 
         return ChatClient.builder(chatModel)
+            .defaultSystem("""
+                You are an interactive CLI assistant.
+                You must use AskUserQuestionTool for every question directed at the user.
+                Never ask the user a question in ordinary assistant text. If you need
+                information, a preference, confirmation, or disambiguation, stop and call
+                AskUserQuestionTool first. After receiving the tool result, continue with
+                the response.
+                The tool input must be a JSON object with a questions array. Each question
+                must contain question, header, options, and multiSelect. The questions field
+                must always be an array, never a string. Each option must contain label and
+                description. Example:
+                {"questions":[{"question":"Which option do you prefer?","header":"Preference","options":[{"label":"Option A","description":"First choice"},{"label":"Option B","description":"Second choice"}],"multiSelect":false}]}
+                """)
             .defaultTools(
                 AskUserQuestionTool.builder()
                     .questionHandler(new CommandLineQuestionHandler())
@@ -351,13 +368,16 @@ class AgentConfiguration {
 }
 ```
 
+> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors` in the builder chain for copy-paste parity with the final project. The real production code wraps the tool via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` and uses `defaultToolCallbacks` for a visible trace and to normalize flat `{"options":…}` payloads into `{"questions":[...]}` — see `UserVisibleToolCallback.java`. The tutorial keeps `defaultTools` for simplicity.
+
 ### 3.3 Verify
 
 ```bash
 mvn spring-boot:run
 # Type: Help me learn Spring AI
-# The AI should ask about your experience level, interests, etc.
+# The AI should ask about your experience level, interests, etc. via AskUserQuestionTool
 # Answer the questions — the AI will tailor its response
+# If the model asks in plain text instead, check that defaultSystem is present (see Common Issues)
 ```
 
 ---
@@ -915,6 +935,19 @@ class AgentConfiguration {
             .build();
 
         return ChatClient.builder(chatModel)
+            .defaultSystem("""
+                You are an interactive CLI assistant.
+                You must use AskUserQuestionTool for every question directed at the user.
+                Never ask the user a question in ordinary assistant text. If you need
+                information, a preference, confirmation, or disambiguation, stop and call
+                AskUserQuestionTool first. After receiving the tool result, continue with
+                the response.
+                The tool input must be a JSON object with a questions array. Each question
+                must contain question, header, options, and multiSelect. The questions field
+                must always be an array, never a string. Each option must contain label and
+                description. Example:
+                {"questions":[{"question":"Which option do you prefer?","header":"Preference","options":[{"label":"Option A","description":"First choice"},{"label":"Option B","description":"Second choice"}],"multiSelect":false}]}
+                """)
             .defaultTools(
                 AskUserQuestionTool.builder()
                     .questionHandler(new CommandLineQuestionHandler())
@@ -993,9 +1026,10 @@ class ChatLoop implements CommandLineRunner {
 | Issue | Fix |
 |-------|-----|
 | `Connection refused` on Ollama | Run `ollama serve` first |
-| Tool calling doesn't work | Use `lfm2.5`, `qwen2.5`, `llama3.1`, or `mistral` — they support function calling |
+| Tool calling doesn't work | Use a model with `tools` support — `lfm2.5` (default, 5.2 GB), `qwen3.5:9b` (6.6 GB) or `gemma4:e4b` (9.6 GB). See [`ollama-model-links.md`](ollama-model-links.md) for the full $<10$ GB comparison |
+| Model asks clarifying question in plain text, never triggers `AskUserQuestionTool` | Tool registered but no system prompt policy — add `.defaultSystem("You must use AskUserQuestionTool for every question… Never ask…")` before `.defaultTools` (see Step 3) |
 | Slow first response | Ollama loads the model into RAM on first call; subsequent calls are fast |
-| `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` |
+| `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` or `qwen3.5:4b` (3.4 GB) |
 | `javax.script` errors | We use SpEL instead — Java 17+ removed Nashorn |
 
 ---
@@ -1173,9 +1207,10 @@ CompletableFuture.runAsync(() -> {
 
 ### Models
 
-- [lfm2.5](https://ollama.com/library/lfm2.5) — 8.5B MoE model with tool calling support
-- [qwen2.5](https://ollama.com/library/qwen2.5) — Alternative model with tool calling
-- [llama3.1](https://ollama.com/library/llama3.1) — Meta's latest Llama model
+- [lfm2.5](https://ollama.com/library/lfm2.5) — 8B MoE (1B active, 5.2 GB) with tool calling — default
+- [qwen3.5:9b](https://ollama.com/library/qwen3.5) — 9B alternative (6.6 GB, 256K, tools+thinking)
+- [gemma4:e4b](https://ollama.com/library/gemma4) — 4.5B effective multimodal (9.6 GB, tools+thinking+vision+audio)
+- Full comparison of $<10$ GB tools-capable models: [`ollama-model-links.md`](ollama-model-links.md) — single source of truth
 
 ### Spring Boot
 

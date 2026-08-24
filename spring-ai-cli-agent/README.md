@@ -77,7 +77,8 @@ Edit `src/main/resources/application.properties`:
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=lfm2.5  # or qwen2.5, llama3.1
+spring.ai.ollama.chat.options.model=lfm2.5  # default (5.2 GB); alternatives: qwen3.5:9b (6.6 GB), gemma4:e4b (9.6 GB)
+# Full <10 GB tools-capable comparison: see ../ollama-model-links.md (single source of truth)
 ```
 
 ## How It Works
