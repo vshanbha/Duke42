@@ -13,6 +13,8 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.support.ToolCallbacks;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,7 +51,7 @@ class AgentConfigurationTest {
     }
 
     @Test
-    void defaultSystemMustRequireAskUserQuestionToolForEveryQuestion() {
+    void defaultSystemShouldBeToolOblivious() {
         ChatModel chatModel = mock(ChatModel.class);
         org.springframework.ai.chat.prompt.ChatOptions opts = org.springframework.ai.chat.prompt.ChatOptions.builder().build();
         when(chatModel.getDefaultOptions()).thenReturn(opts);
@@ -69,40 +71,36 @@ class AgentConfigurationTest {
         Prompt prompt = captor.getValue();
         String promptText = prompt.getInstructions().toString() + " " + prompt.getContents();
 
-        assertThat(promptText).contains("AskUserQuestionTool");
-        assertThat(promptText).contains("You must use AskUserQuestionTool for every question");
-        assertThat(promptText).contains("Never ask the user a question in ordinary assistant text");
-        assertThat(promptText).contains("\"questions\"");
+        assertThat(promptText).contains("You are an interactive CLI assistant");
+        assertThat(promptText).contains("Be helpful, concise");
+        // System prompt must NOT mention tool-specific details — those belong in the tool description.
+        assertThat(promptText).doesNotContain("AskUserQuestionTool");
+        assertThat(promptText).doesNotContain("questions array");
+        assertThat(promptText).doesNotContain("The tool input must be a JSON object");
     }
 
     @Test
-    void defaultSystemMustDocumentQuestionsArraySchema() {
-        ChatModel chatModel = mock(ChatModel.class);
-        org.springframework.ai.chat.prompt.ChatOptions opts = org.springframework.ai.chat.prompt.ChatOptions.builder().build();
-        when(chatModel.getDefaultOptions()).thenReturn(opts);
-        when(chatModel.getOptions()).thenReturn(opts);
-        ChatResponse dummy = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))));
-        when(chatModel.call(any(Prompt.class))).thenReturn(dummy);
+    void askUserQuestionToolDescriptionShouldContainUsagePolicyAndSchema() {
+        // The policy previously lived in defaultSystem; now it must live in the tool description.
+        ToolCallback delegate = ToolCallbacks.from(
+            org.springaicommunity.agent.tools.AskUserQuestionTool.builder()
+                .questionHandler(questions -> java.util.Map.of())
+                .build()
+        )[0];
+        ToolCallback wrapped = new UserVisibleToolCallback(delegate);
+        String description = wrapped.getToolDefinition().description();
 
-        @SuppressWarnings("unchecked")
-        ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider = mock(ObjectProvider.class);
-        AgentConfiguration config = new AgentConfiguration();
-        ChatClient chatClient = config.chatClient(chatModel, mcpProvider);
-
-        chatClient.prompt().user("Need clarification?").advisors(a -> a.param(org.springframework.ai.chat.memory.ChatMemory.CONVERSATION_ID, "test-2")).call().content();
-
-        ArgumentCaptor<Prompt> captor = ArgumentCaptor.forClass(Prompt.class);
-        verify(chatModel).call(captor.capture());
-        String promptText = captor.getValue().getInstructions().toString() + " " + captor.getValue().getContents();
-
-        assertThat(promptText).contains("questions array");
-        assertThat(promptText).contains("header");
-        assertThat(promptText).contains("multiSelect");
-        assertThat(promptText).contains("label");
+        assertThat(description).contains("You MUST use this tool for every question");
+        assertThat(description).contains("Never ask the user a question in ordinary assistant text");
+        assertThat(description).contains("questions");
+        assertThat(description).contains("header");
+        assertThat(description).contains("multiSelect");
+        assertThat(description).contains("label");
+        assertThat(description).contains("{\"questions\"");
     }
 
     @Test
-    void tutorialStep3MustDocumentDefaultSystemPolicy() throws Exception {
+    void tutorialStep3MustDocumentToolDescriptionPolicy() throws Exception {
         Path tutorial = Path.of("").toAbsolutePath().resolve("TUTORIAL.md");
         if (!Files.exists(tutorial)) {
             tutorial = Path.of("../TUTORIAL.md").toAbsolutePath().normalize();
@@ -114,8 +112,12 @@ class AgentConfigurationTest {
 
         String content = Files.readString(tutorial);
         assertThat(content).contains("Why registration alone is not enough");
-        assertThat(content).contains("You must use AskUserQuestionTool for every question");
-        assertThat(content).contains("Never ask the user a question in ordinary assistant text");
-        assertThat(content).contains("The tool input must be a JSON object with a questions array");
+        // Tutorial must explain that the policy belongs in the tool description, not the system prompt.
+        assertThat(content).contains("tool-oblivious");
+        assertThat(content).contains("UserVisibleToolCallback");
+        assertThat(content).contains("MUST use this tool for every question");
+        // System prompt example must be generic and tool-oblivious.
+        assertThat(content).contains("You are an interactive CLI assistant.");
+        assertThat(content).contains("Be helpful, concise");
     }
 }

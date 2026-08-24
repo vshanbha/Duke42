@@ -301,7 +301,7 @@ mvn spring-boot:run
 
 `AskUserQuestionTool` lets the AI ask clarifying questions mid-conversation. For example, if you say "Help me learn Spring AI," the AI might ask "What's your experience level?" before giving advice.
 
-> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. LLMs are pre-trained to clarify in plain text. Without an explicit tool-usage policy in the system prompt the model will often skip the tool and emit `What's your experience?` as assistant text — so `CommandLineQuestionHandler` never fires. The `defaultSystem` policy below forces every user-directed question through `AskUserQuestionTool` in a structured, handler-driven way. The JSON schema in the same prompt tells the model the exact shape (`{"questions":[{question,header,options:[{label,description}],multiSelect}]}`) that `CommandLineQuestionHandler` expects.
+> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. LLMs are pre-trained to clarify in plain text. Without an explicit tool-usage policy the model will often skip the tool and emit `What's your experience?` as assistant text — so `CommandLineQuestionHandler` never fires. That policy belongs in the **tool description** (where the model decides *when* to call a tool), not in the system prompt. The system prompt stays tool-oblivious; `UserVisibleToolCallback` enriches `AskUserQuestionTool`'s description with the strict "use this tool for every user-directed question" rule and the exact JSON shape (`{"questions":[{question,header,options:[{label,description}],multiSelect}]}`) that `CommandLineQuestionHandler` expects. This keeps concerns separated: the system prompt defines *who the assistant is*, the tool defines *when and how to call it*.
 
 ### 3.1 Add Dependency
 
@@ -317,7 +317,7 @@ Add to `pom.xml`:
 
 ### 3.2 Update AgentConfiguration
 
-Add a `defaultSystem` prompt that *requires* clarification via the tool, then register the tool:
+Keep the system prompt tool-oblivious and register the tool. The tool's prompt details are supplied by its own description (enriched at runtime by `UserVisibleToolCallback`):
 
 ```java
 package com.example.cliai.agent;
@@ -344,16 +344,7 @@ class AgentConfiguration {
         return ChatClient.builder(chatModel)
             .defaultSystem("""
                 You are an interactive CLI assistant.
-                You must use AskUserQuestionTool for every question directed at the user.
-                Never ask the user a question in ordinary assistant text. If you need
-                information, a preference, confirmation, or disambiguation, stop and call
-                AskUserQuestionTool first. After receiving the tool result, continue with
-                the response.
-                The tool input must be a JSON object with a questions array. Each question
-                must contain question, header, options, and multiSelect. The questions field
-                must always be an array, never a string. Each option must contain label and
-                description. Example:
-                {"questions":[{"question":"Which option do you prefer?","header":"Preference","options":[{"label":"Option A","description":"First choice"},{"label":"Option B","description":"Second choice"}],"multiSelect":false}]}
+                Be helpful, concise, and use the tools available to you when appropriate.
                 """)
             .defaultTools(
                 AskUserQuestionTool.builder()
@@ -368,7 +359,7 @@ class AgentConfiguration {
 }
 ```
 
-> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors` in the builder chain for copy-paste parity with the final project. The real production code wraps the tool via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` and uses `defaultToolCallbacks` for a visible trace and to normalize flat `{"options":…}` payloads into `{"questions":[...]}` — see `UserVisibleToolCallback.java`. The tutorial keeps `defaultTools` for simplicity.
+> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors` in the builder chain for copy-paste parity with the final project. The real production code wraps the tool via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` and uses `defaultToolCallbacks` for a visible trace, schema-aware enrichment of `AskUserQuestionTool`'s description ("MUST use this tool for every question…", JSON `{"questions":[...]}` shape + example), and to normalize flat `{"options":…}` payloads into `{"questions":[...]}` — see `UserVisibleToolCallback.java`. The tutorial keeps `defaultTools` for simplicity; the enrichment is what makes the simple `defaultTools` registration still enforce the clarification policy.
 
 ### 3.3 Verify
 
@@ -937,16 +928,7 @@ class AgentConfiguration {
         return ChatClient.builder(chatModel)
             .defaultSystem("""
                 You are an interactive CLI assistant.
-                You must use AskUserQuestionTool for every question directed at the user.
-                Never ask the user a question in ordinary assistant text. If you need
-                information, a preference, confirmation, or disambiguation, stop and call
-                AskUserQuestionTool first. After receiving the tool result, continue with
-                the response.
-                The tool input must be a JSON object with a questions array. Each question
-                must contain question, header, options, and multiSelect. The questions field
-                must always be an array, never a string. Each option must contain label and
-                description. Example:
-                {"questions":[{"question":"Which option do you prefer?","header":"Preference","options":[{"label":"Option A","description":"First choice"},{"label":"Option B","description":"Second choice"}],"multiSelect":false}]}
+                Be helpful, concise, and use the tools available to you when appropriate.
                 """)
             .defaultTools(
                 AskUserQuestionTool.builder()
@@ -963,6 +945,8 @@ class AgentConfiguration {
     }
 }
 ```
+
+> **Note:** As with Step 3, production code wraps the tools via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` and enriches `AskUserQuestionTool`'s description with the "MUST use for every question…" policy and JSON `{"questions":[...]}` schema/example — the system prompt remains tool-oblivious.
 
 ---
 
@@ -1027,7 +1011,7 @@ class ChatLoop implements CommandLineRunner {
 |-------|-----|
 | `Connection refused` on Ollama | Run `ollama serve` first |
 | Tool calling doesn't work | Use a model with `tools` support — `lfm2.5` (default, 5.2 GB), `qwen3.5:9b` (6.6 GB) or `gemma4:e4b` (9.6 GB). See [`ollama-model-links.md`](ollama-model-links.md) for the full $<10$ GB comparison |
-| Model asks clarifying question in plain text, never triggers `AskUserQuestionTool` | Tool registered but no system prompt policy — add `.defaultSystem("You must use AskUserQuestionTool for every question… Never ask…")` before `.defaultTools` (see Step 3) |
+| Model asks clarifying question in plain text, never triggers `AskUserQuestionTool` | Tool registered but no description policy — ensure `AskUserQuestionTool`'s description requires "MUST use for every question… Never ask in ordinary text" (production code does this via `UserVisibleToolCallback`; tutorial `defaultTools` relies on the same enriched description when using the real code path) |
 | Slow first response | Ollama loads the model into RAM on first call; subsequent calls are fast |
 | `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` or `qwen3.5:4b` (3.4 GB) |
 | `javax.script` errors | We use SpEL instead — Java 17+ removed Nashorn |
