@@ -1188,10 +1188,9 @@ spring-ai-cli-agent/
 
 ```properties
 # Local Ollama endpoint and chat model used by Spring AI.
-# Default is lfm2.5 (5.2 GB, fastest, tools+thinking). Alternatives under 10 GB with tools:
-# qwen3.5:9b (6.6 GB, 256K) and gemma4:e4b (9.6 GB, vision+audio) — see ../../ollama-model-links.md
+# Default was lfm2.5 (5.2 GB, fastest). Switched to gemma4:e4b-mlx (8.8 GB MLX, more reliable tool-calling) per manual CLI verification – see ../../ollama-model-links.md (model: gemma4:e4b)
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=lfm2.5
+spring.ai.ollama.chat.options.model=gemma4:e4b-mlx
 # MCP client is disabled by default so unit tests run without external dependencies.
 spring.ai.mcp.client.enabled=false
 spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
@@ -1226,15 +1225,15 @@ class AgentConfiguration {
             .build();
 
         // QnA implemented separately per https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool
-        // and AskUserQuestionTool.md – tool implementation passed as .questionHandler(...) to builder (no ToolCallbacks wrapping hack)
+        // and AskUserQuestionTool.md – tool implementation passed as .questionHandler(new CommandLineQuestionHandler()) to builder
         // Spec: https://code.claude.com/docs/en/agent-sdk/user-input#question-format (questions[]:{question,header,options{label,description},multiSelect})
         AskUserQuestionTool askUserQuestionTool = AskUserQuestionTool.builder()
             .questionHandler(new CommandLineQuestionHandler())
             .build();
 
-        // Domain tools embellished with pure trace – QnA stays separate, no AoP branching or normalization wrapper
-        ToolCallback[] domainWithTrace = java.util.Arrays.stream(
-                ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool()))
+        // Visibility embellishment for all tools (including QnA) – pure trace, no definition mutation or spec decoration
+        ToolCallback[] allWithTrace = java.util.Arrays.stream(
+                ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
             .map(UserVisibleToolCallback::new)
             .toArray(ToolCallback[]::new);
 
@@ -1243,8 +1242,7 @@ class AgentConfiguration {
                 You are an interactive CLI assistant.
                 Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
                 """)
-            .defaultTools(askUserQuestionTool)
-            .defaultToolCallbacks(domainWithTrace)
+            .defaultToolCallbacks(allWithTrace)
             .defaultAdvisors(
                 new SimpleLoggerAdvisor(),
                 MessageChatMemoryAdvisor.builder(chatMemory).build()
@@ -1257,7 +1255,7 @@ class AgentConfiguration {
 }
 ```
 
-QnA is a separate first-class tool (`AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` per blog/docs, spec `questions[]:{question,header,options{label,description},multiSelect}`); `UserVisibleToolCallback` is pure trace embellishment for domain tools (no `if-else`).
+QnA is a separate first-class tool (`AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` per blog/docs, spec `questions[]:{question,header,options{label,description},multiSelect}`); `UserVisibleToolCallback` is pure trace embellishment for all tools (including QnA) – no `if-else`, visible as `[Tool]`/`[Tool arguments]`/`[Tool result]` in manual `mvn spring-boot:run`.
 
 ## Complete UserVisibleToolCallback.java
 

@@ -27,15 +27,15 @@ class AgentConfiguration {
             .build();
 
         // QnA implemented separately per https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool
-        // and AskUserQuestionTool.md – tool implementation passed as .questionHandler(...) to builder (no ToolCallbacks wrapping hack)
+        // and AskUserQuestionTool.md – tool implementation passed as .questionHandler(new CommandLineQuestionHandler()) to builder
         // Spec: https://code.claude.com/docs/en/agent-sdk/user-input#question-format (questions[]:{question,header,options{label,description},multiSelect})
         AskUserQuestionTool askUserQuestionTool = AskUserQuestionTool.builder()
             .questionHandler(new CommandLineQuestionHandler())
             .build();
 
-        // Domain tools embellished with pure trace – QnA stays separate, no AoP branching or normalization wrapper
-        ToolCallback[] domainWithTrace = java.util.Arrays.stream(
-                ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool()))
+        // Visibility embellishment for all tools (including QnA) – pure trace, no definition mutation or spec decoration
+        ToolCallback[] allWithTrace = java.util.Arrays.stream(
+                ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
             .map(UserVisibleToolCallback::new)
             .toArray(ToolCallback[]::new);
 
@@ -44,8 +44,7 @@ class AgentConfiguration {
                 You are an interactive CLI assistant.
                 Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
                 """)
-            .defaultTools(askUserQuestionTool)
-            .defaultToolCallbacks(domainWithTrace)
+            .defaultToolCallbacks(allWithTrace)
             .defaultAdvisors(
                 new SimpleLoggerAdvisor(),
                 MessageChatMemoryAdvisor.builder(chatMemory).build()
