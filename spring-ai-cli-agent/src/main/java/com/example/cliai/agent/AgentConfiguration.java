@@ -26,12 +26,21 @@ class AgentConfiguration {
             .maxMessages(20)
             .build();
 
-        Object askUserQuestionTool = AskUserQuestionTool.builder()
+        // QnA tool is a first-class citizen per https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool
+        // and https://github.com/spring-ai-community/spring-ai-agent-utils/blob/main/spring-ai-agent-utils/docs/AskUserQuestionTool.md
+        // Spec: https://code.claude.com/docs/en/agent-sdk/user-input#question-format (questions[]:{question,header,options{label,description},multiSelect})
+        // Implemented separately with its own QuestionHandler – not bundled via AoP if-else.
+        AskUserQuestionTool askUserQuestionTool = AskUserQuestionTool.builder()
             .questionHandler(new CommandLineQuestionHandler())
             .build();
 
-        ToolCallback[] visibleTools = java.util.Arrays.stream(
-                ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
+        ToolCallback qnaNormalized = new AskUserQuestionNormalizationCallback(
+            ToolCallbacks.from(askUserQuestionTool)[0]);
+        ToolCallback[] domainCallbacks = ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool());
+
+        ToolCallback[] visibleTools = java.util.stream.Stream.concat(
+                java.util.stream.Stream.of(qnaNormalized),
+                java.util.Arrays.stream(domainCallbacks))
             .map(UserVisibleToolCallback::new)
             .toArray(ToolCallback[]::new);
 
