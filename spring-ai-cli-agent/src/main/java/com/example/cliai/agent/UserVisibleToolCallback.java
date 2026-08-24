@@ -21,7 +21,27 @@ final class UserVisibleToolCallback implements ToolCallback {
 
     @Override
     public ToolDefinition getToolDefinition() {
-        return delegate.getToolDefinition();
+        ToolDefinition original = delegate.getToolDefinition();
+        if (!original.name().toLowerCase().contains("askuserquestion")) {
+            return original;
+        }
+        String enriched = original.description()
+            + "\n\nYou MUST use this tool for every question directed at the user. "
+            + "Never ask the user a question in ordinary assistant text. "
+            + "If you need information, a preference, confirmation, or disambiguation, "
+            + "stop and call this tool first. After receiving the tool result, continue with the response."
+            + "\n\nThe tool input must be a JSON object with a \"questions\" array. "
+            + "Each question must contain \"question\", \"header\", \"options\", and \"multiSelect\". "
+            + "The \"questions\" field must always be an array, never a string. "
+            + "Each option must contain \"label\" and \"description\". "
+            + "Example: {\"questions\":[{\"question\":\"Which option do you prefer?\",\"header\":\"Preference\","
+            + "\"options\":[{\"label\":\"Option A\",\"description\":\"First choice\"},"
+            + "{\"label\":\"Option B\",\"description\":\"Second choice\"}],\"multiSelect\":false}]}";
+        return ToolDefinition.builder()
+            .name(original.name())
+            .description(enriched)
+            .inputSchema(original.inputSchema())
+            .build();
     }
 
     @Override

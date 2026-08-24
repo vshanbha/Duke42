@@ -290,9 +290,9 @@ external data or user input. The AI *decides* when to call them. You don't invok
 
 `AskUserQuestionTool` lets the AI ask clarifying questions mid-conversation. Without guidance the model will clarify in plain text and `CommandLineQuestionHandler` never fires.
 
-> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. The model must be told to route every user-directed question through `AskUserQuestionTool`. The `defaultSystem` policy below does that and also teaches the exact JSON shape (`{"questions":[{question,header,options:[{label,description}],multiSelect}]}`) that the handler expects.
+> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. The model must be told to route every user-directed question through `AskUserQuestionTool`. That policy belongs in the **tool description**, not the system prompt. The system prompt stays tool-oblivious; `UserVisibleToolCallback` enriches `AskUserQuestionTool`'s description with the strict "MUST use for every question…" rule and the exact JSON shape (`{"questions":[{question,header,options:[{label,description}],multiSelect}]}`) that the handler expects. This keeps concerns separated: system prompt defines *who the assistant is*, the tool defines *when/how to call it*.
 
-**What you'll add**: AskUserQuestionTool + a `defaultSystem` tool-usage policy so clarification is always structured.
+**What you'll add**: AskUserQuestionTool with a tool-description-embedded clarification policy so every user-directed question is structured.
 
 **New dependency** in `pom.xml`:
 
@@ -319,16 +319,7 @@ class AgentConfiguration {
         return ChatClient.builder(chatModel)
             .defaultSystem("""
                 You are an interactive CLI assistant.
-                You must use AskUserQuestionTool for every question directed at the user.
-                Never ask the user a question in ordinary assistant text. If you need
-                information, a preference, confirmation, or disambiguation, stop and call
-                AskUserQuestionTool first. After receiving the tool result, continue with
-                the response.
-                The tool input must be a JSON object with a questions array. Each question
-                must contain question, header, options, and multiSelect. The questions field
-                must always be an array, never a string. Each option must contain label and
-                description. Example:
-                {"questions":[{"question":"Which option do you prefer?","header":"Preference","options":[{"label":"Option A","description":"First choice"},{"label":"Option B","description":"Second choice"}],"multiSelect":false}]}
+                Be helpful, concise, and use the tools available to you when appropriate.
                 """)
             .defaultTools(
                 AskUserQuestionTool.builder()
@@ -343,7 +334,7 @@ class AgentConfiguration {
 }
 ```
 
-> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors`. Real production code wraps via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` for trace + schema normalization — tutorial keeps `defaultTools` for simplicity.
+> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors`. Real production code wraps via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` for trace, description enrichment ("MUST use for every question…" + JSON `{"questions":[...]}` schema/example), and schema normalization — tutorial keeps `defaultTools` for simplicity.
 
 **New imports**:
 
@@ -681,16 +672,7 @@ class AgentConfiguration {
         return ChatClient.builder(chatModel)
             .defaultSystem("""
                 You are an interactive CLI assistant.
-                You must use AskUserQuestionTool for every question directed at the user.
-                Never ask the user a question in ordinary assistant text. If you need
-                information, a preference, confirmation, or disambiguation, stop and call
-                AskUserQuestionTool first. After receiving the tool result, continue with
-                the response.
-                The tool input must be a JSON object with a questions array. Each question
-                must contain question, header, options, and multiSelect. The questions field
-                must always be an array, never a string. Each option must contain label and
-                description. Example:
-                {"questions":[{"question":"Which option do you prefer?","header":"Preference","options":[{"label":"Option A","description":"First choice"},{"label":"Option B","description":"Second choice"}],"multiSelect":false}]}
+                Be helpful, concise, and use the tools available to you when appropriate.
                 """)
             .defaultTools(
                 AskUserQuestionTool.builder()
@@ -707,6 +689,8 @@ class AgentConfiguration {
     }
 }
 ```
+
+> **Note:** Production code wraps tools via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` and `UserVisibleToolCallback` enriches `AskUserQuestionTool`'s description with the "MUST use for every question…" policy and JSON `{"questions":[...]}` schema/example; the system prompt stays tool-oblivious.
 
 ### `ChatLoop.java` (complete)
 
@@ -795,7 +779,7 @@ java -jar spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 |---|---|
 | `Connection refused` on Ollama | `ollama serve` must be running |
 | Tool calling doesn't work | Use a model with `tools` support — `lfm2.5` (default, 5.2 GB), `qwen3.5:9b` (6.6 GB) or `gemma4:e4b` (9.6 GB). See [`ollama-model-links.md`](ollama-model-links.md) for the full $<10$ GB comparison |
-| Model asks in plain text, never triggers `AskUserQuestionTool` | Tool registered but no system prompt policy — add `.defaultSystem("You must use AskUserQuestionTool for every question… Never ask…")` before `.defaultTools` (see STEP 3) |
+| Model asks in plain text, never triggers `AskUserQuestionTool` | Tool description missing the "MUST use for every question… Never ask…" policy — ensure `UserVisibleToolCallback` enrichment is active (see STEP 3) |
 | Slow first response | Ollama loads the model into RAM on first call; subsequent calls are fast |
 | `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` or `qwen3.5:4b` (3.4 GB) |
 | Build fails on native image | Skip native for now, use `java -jar` |
