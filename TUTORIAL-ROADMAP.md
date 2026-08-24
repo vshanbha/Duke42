@@ -313,13 +313,13 @@ Adopted patterns from softwareaifactory.sh:
 
 - Java 17+ (Spring AI 2.0 requirement)
 - Maven 3.6+
-- Ollama CLI with models: `lfm2.5`, `qwen2.5`, `llama3.1`, `mistral`
+- Ollama CLI with model `lfm2.5` (default, 5.2 GB) — alternatives `<10$ GB` with tools: `qwen3.5:9b` (6.6 GB), `gemma4:e4b` (9.6 GB). Full comparison in [`ollama-model-links.md`](ollama-model-links.md) (single source of truth)
 - GraalVM 21+ (optional, for native image)
 
 ## Common Pitfalls
 
 1. **Ollama not running**: `Connection refused` on localhost:11434
-2. **Wrong model**: Tool calling requires `lfm2.5`, `qwen2.5`, `llama3.1`, or `mistral`
+2. **Wrong model**: Tool calling requires a model with `tools` support — `lfm2.5` (default), `qwen3.5:9b` or `gemma4:e4b` (see `ollama-model-links.md`)
 3. **Slow first response**: Ollama loads model into RAM on first call
 4. **OutOfMemoryError**: Use smaller model like `lfm2.5`
 5. **Build fails**: Skip native image for now, use `java -jar`

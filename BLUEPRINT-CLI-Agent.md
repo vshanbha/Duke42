@@ -34,7 +34,7 @@ ollama run lfm2.5 "Say hello"
 - **Free**: No API keys, no usage limits, no billing
 - **Private**: Everything runs on your machine
 - **Fast**: No network latency for local models
-- **Tool calling**: `lfm2.5`, `qwen2.5`, `llama3.1`, and `mistral` support function calling
+- **Tool calling**: `lfm2.5` (default, 5.2 GB), `qwen3.5:9b` (6.6 GB) and `gemma4:e4b` (9.6 GB) support function calling — full $<10$ GB comparison in [`ollama-model-links.md`](ollama-model-links.md)
 
 ---
 
@@ -288,7 +288,11 @@ mvn spring-boot:run
 **Concept**: Tools are like stored procedures — plugins the AI can invoke when it needs
 external data or user input. The AI *decides* when to call them. You don't invoke tools.
 
-**What you'll add**: AskUserQuestionTool so the AI can ask clarifying questions.
+`AskUserQuestionTool` lets the AI ask clarifying questions mid-conversation. Without guidance the model will clarify in plain text and `CommandLineQuestionHandler` never fires.
+
+> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. The model must be told to route every user-directed question through `AskUserQuestionTool`. The `defaultSystem` policy below does that and also teaches the exact JSON shape (`{"questions":[{question,header,options:[{label,description}],multiSelect}]}`) that the handler expects.
+
+**What you'll add**: AskUserQuestionTool + a `defaultSystem` tool-usage policy so clarification is always structured.
 
 **New dependency** in `pom.xml`:
 
@@ -313,6 +317,19 @@ class AgentConfiguration {
             .build();
 
         return ChatClient.builder(chatModel)
+            .defaultSystem("""
+                You are an interactive CLI assistant.
+                You must use AskUserQuestionTool for every question directed at the user.
+                Never ask the user a question in ordinary assistant text. If you need
+                information, a preference, confirmation, or disambiguation, stop and call
+                AskUserQuestionTool first. After receiving the tool result, continue with
+                the response.
+                The tool input must be a JSON object with a questions array. Each question
+                must contain question, header, options, and multiSelect. The questions field
+                must always be an array, never a string. Each option must contain label and
+                description. Example:
+                {"questions":[{"question":"Which option do you prefer?","header":"Preference","options":[{"label":"Option A","description":"First choice"},{"label":"Option B","description":"Second choice"}],"multiSelect":false}]}
+                """)
             .defaultTools(
                 AskUserQuestionTool.builder()
                     .questionHandler(new CommandLineQuestionHandler())
@@ -326,6 +343,8 @@ class AgentConfiguration {
 }
 ```
 
+> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors`. Real production code wraps via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` for trace + schema normalization — tutorial keeps `defaultTools` for simplicity.
+
 **New imports**:
 
 ```java
@@ -337,8 +356,9 @@ import org.springaicommunity.agent.utils.CommandLineQuestionHandler;
 ```bash
 mvn spring-boot:run
 # Type: Help me learn Spring AI
-# The AI should ask about your experience level, interests, etc.
+# The AI should ask about your experience level, interests, etc. via AskUserQuestionTool
 # Answer the questions — the AI will tailor its response
+# If it asks in plain text instead, check that defaultSystem is present (see Common Issues)
 ```
 
 ---
@@ -659,6 +679,19 @@ class AgentConfiguration {
             .build();
 
         return ChatClient.builder(chatModel)
+            .defaultSystem("""
+                You are an interactive CLI assistant.
+                You must use AskUserQuestionTool for every question directed at the user.
+                Never ask the user a question in ordinary assistant text. If you need
+                information, a preference, confirmation, or disambiguation, stop and call
+                AskUserQuestionTool first. After receiving the tool result, continue with
+                the response.
+                The tool input must be a JSON object with a questions array. Each question
+                must contain question, header, options, and multiSelect. The questions field
+                must always be an array, never a string. Each option must contain label and
+                description. Example:
+                {"questions":[{"question":"Which option do you prefer?","header":"Preference","options":[{"label":"Option A","description":"First choice"},{"label":"Option B","description":"Second choice"}],"multiSelect":false}]}
+                """)
             .defaultTools(
                 AskUserQuestionTool.builder()
                     .questionHandler(new CommandLineQuestionHandler())
@@ -761,9 +794,10 @@ java -jar spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 | Issue | Fix |
 |---|---|
 | `Connection refused` on Ollama | `ollama serve` must be running |
-| Tool calling doesn't work | Use a model that supports it: `lfm2.5`, `qwen2.5`, `llama3.1`, `mistral` |
+| Tool calling doesn't work | Use a model with `tools` support — `lfm2.5` (default, 5.2 GB), `qwen3.5:9b` (6.6 GB) or `gemma4:e4b` (9.6 GB). See [`ollama-model-links.md`](ollama-model-links.md) for the full $<10$ GB comparison |
+| Model asks in plain text, never triggers `AskUserQuestionTool` | Tool registered but no system prompt policy — add `.defaultSystem("You must use AskUserQuestionTool for every question… Never ask…")` before `.defaultTools` (see STEP 3) |
 | Slow first response | Ollama loads the model into RAM on first call; subsequent calls are fast |
-| `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` |
+| `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` or `qwen3.5:4b` (3.4 GB) |
 | Build fails on native image | Skip native for now, use `java -jar` |
 
 ---

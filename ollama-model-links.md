@@ -1,8 +1,12 @@
 # Ollama Model Comparison — Edge General Purpose CLI Agent
 
+> **Single source of truth** for all model sizes, tool support and Ollama library links in this repo.
+> `TUTORIAL.md`, `BLUEPRINT-CLI-Agent.md` and `application.properties` link here instead of duplicating tables.
+
 **Goal**: Build a general-purpose CLI agent that runs locally on edge hardware
-**Constraints**: Under 6GB RAM, tools + thinking support, no cloud dependency
+**Constraints**: Under 10 GB download, tools + thinking support, no cloud dependency
 **Stack**: Spring Boot + Spring AI + Ollama (local, free, private)
+**Default**: `lfm2.5` (5.2 GB, fastest, MoE 8B/1B active, 125K). Alternatives under 10 GB: `qwen3.5:9b` (6.6 GB, 256K) and `gemma4:e4b` (9.6 GB, vision+audio) — both with `tools`.
 
 ---
 
