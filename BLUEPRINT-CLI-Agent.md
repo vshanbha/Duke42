@@ -24,6 +24,7 @@
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull gemma4:e4b        # default CLI, 9.6 GB, tools+thinking+vision+audio — or gemma4:e4b-mlx on Mac
+ollama pull minicpm-v4.6      # small vision 1.6 GB, tools+vision, already downloaded — for edge vision
 ollama pull lfm2.5            # alternative 5.2 GB, fastest — still in ollama-model-links.md
 ollama run gemma4:e4b "Say hello"
 ```
@@ -172,11 +173,11 @@ Duke42/
 
 ### STEP 8: Multimodality (Multimodality, Models – Vision/Audio)
 
-**Concept**: `Multimodality` — `UserMessage(Media(MimeType, Resource))` for `gemma4:e4b` vision+audio.
+**Concept**: `Multimodality` — `UserMessage(Media(MimeType, Resource))` for vision+audio. Default `gemma4:e4b` (9.6 GB) does vision+audio, but for edge use `minicpm-v4.6:latest` (1.6 GB, already downloaded, `ollama list`).
 
-**What you'll build**: `ChatLoop` `/image /tmp/pic.jpg What do you see?` → `new UserMessage("...", new Media(MimeTypeUtils.IMAGE_PNG, new FileSystemResource(path)))`.
+**What you'll build**: `ChatLoop` `/image /tmp/pic.jpg What do you see?` → `new UserMessage("...", new Media(MimeTypeUtils.IMAGE_PNG, new FileSystemResource(path)))` via `minicpm-v4.6` or `gemma4:e4b`.
 
-**Verify**: Image of bananas → `basket with bananas...`.
+**Verify**: `ollama pull minicpm-v4.6` (1.6 GB) → image of bananas → `basket with bananas...` (small vision, `tools+vision`); `gemma4:e4b` also works but larger.
 
 ### STEP 9: Models – Chat/Embedding/Image/Audio/Moderation
 
