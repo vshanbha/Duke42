@@ -319,7 +319,7 @@ class AgentConfiguration {
         return ChatClient.builder(chatModel)
             .defaultSystem("""
                 You are an interactive CLI assistant.
-                Be helpful, concise, and use the tools available to you when appropriate.
+                Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
                 """)
             .defaultTools(
                 AskUserQuestionTool.builder()
@@ -334,7 +334,7 @@ class AgentConfiguration {
 }
 ```
 
-> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors`. Real production code wraps via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` for trace, description enrichment ("MUST use for every question…" + JSON `{"questions":[...]}` schema/example), and schema normalization — tutorial keeps `defaultTools` for simplicity.
+> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors` and stays tool-oblivious but directive (`use an available tool to ask - never ask...`). Real production code wraps via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` for visible `[Tool]` trace, description enrichment (`MUST use for every question…` + JSON `{"questions":[...]}` schema/example), and `{"options":...}` → `{"questions":[...]}` normalization – see `UserVisibleToolCallback.java` (3.3 in TUTORIAL).
 
 **New imports**:
 
@@ -672,7 +672,7 @@ class AgentConfiguration {
         return ChatClient.builder(chatModel)
             .defaultSystem("""
                 You are an interactive CLI assistant.
-                Be helpful, concise, and use the tools available to you when appropriate.
+                Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
                 """)
             .defaultTools(
                 AskUserQuestionTool.builder()
@@ -690,7 +690,7 @@ class AgentConfiguration {
 }
 ```
 
-> **Note:** Production code wraps tools via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` and `UserVisibleToolCallback` enriches `AskUserQuestionTool`'s description with the "MUST use for every question…" policy and JSON `{"questions":[...]}` schema/example; the system prompt stays tool-oblivious.
+> **Note:** Production code wraps tools via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` and `UserVisibleToolCallback` enriches `AskUserQuestionTool`'s description with `MUST use for every question…` + JSON `{"questions":[...]}` schema/example, prints `[Tool]` trace and normalizes `{"options":...}` → `{"questions":[...]}`; system prompt stays tool-oblivious but directive (`use an available tool to ask - never ask...`).
 
 ### `ChatLoop.java` (complete)
 
@@ -848,26 +848,14 @@ The backend module provides a Vaadin web UI, REST API, and MCP client for enterp
 </dependencies>
 ```
 
-### Backend Application.yaml
+### Backend application.properties
 
-```yaml
-spring:
-  ai:
-    ollama:
-      base-url: http://localhost:11434
-      chat:
-        options:
-          model: lfm2.5
-    mcp:
-      client:
-        enabled: false
-        sse:
-          connections:
-            polyglot:
-              url: http://localhost:9000
-
-server:
-  port: 8080
+```properties
+spring.ai.ollama.base-url=http://localhost:11434
+spring.ai.ollama.chat.options.model=lfm2.5
+spring.ai.mcp.client.enabled=false
+spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
+server.port=8080
 ```
 
 ### Backend REST Endpoints

@@ -303,9 +303,9 @@ mvn spring-boot:run
 
 > **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. LLMs are pre-trained to clarify in plain text. Without an explicit tool-usage policy the model will often skip the tool and emit `What's your experience?` as assistant text — so `CommandLineQuestionHandler` never fires. That policy belongs in the **tool description** (where the model decides *when* to call a tool), not in the system prompt. The system prompt stays tool-oblivious; `UserVisibleToolCallback` enriches `AskUserQuestionTool`'s description with the strict "use this tool for every user-directed question" rule and the exact JSON shape (`{"questions":[{question,header,options:[{label,description}],multiSelect}]}`) that `CommandLineQuestionHandler` expects. This keeps concerns separated: the system prompt defines *who the assistant is*, the tool defines *when and how to call it*.
 
-### 3.1 Add Dependency
+### 3.1 Add Dependencies
 
-Add to `pom.xml`:
+Add to `pom.xml` (`spring-ai-agent-utils` for `AskUserQuestionTool`; `spring-ai-starter-mcp-client` for optional MCP `SyncMcpToolCallbackProvider` used in the production `AgentConfiguration`):
 
 ```xml
 <dependency>
@@ -313,11 +313,15 @@ Add to `pom.xml`:
     <artifactId>spring-ai-agent-utils</artifactId>
     <version>0.10.0</version>
 </dependency>
+<dependency>
+    <groupId>org.springframework.ai</groupId>
+    <artifactId>spring-ai-starter-mcp-client</artifactId>
+</dependency>
 ```
 
 ### 3.2 Update AgentConfiguration
 
-Keep the system prompt tool-oblivious and register the tool. The tool's prompt details are supplied by its own description (enriched at runtime by `UserVisibleToolCallback`):
+Keep the system prompt **tool-oblivious** but still nudging – it says *use an available tool to ask, never ask in ordinary text* without naming `AskUserQuestionTool`. Tool-specific `MUST` + JSON schema lives in the tool description, not in `defaultSystem`:
 
 ```java
 package com.example.cliai.agent;
@@ -344,7 +348,7 @@ class AgentConfiguration {
         return ChatClient.builder(chatModel)
             .defaultSystem("""
                 You are an interactive CLI assistant.
-                Be helpful, concise, and use the tools available to you when appropriate.
+                Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
                 """)
             .defaultTools(
                 AskUserQuestionTool.builder()
@@ -359,16 +363,75 @@ class AgentConfiguration {
 }
 ```
 
-> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors` in the builder chain for copy-paste parity with the final project. The real production code wraps the tool via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` and uses `defaultToolCallbacks` for a visible trace, schema-aware enrichment of `AskUserQuestionTool`'s description ("MUST use this tool for every question…", JSON `{"questions":[...]}` shape + example), and to normalize flat `{"options":…}` payloads into `{"questions":[...]}` — see `UserVisibleToolCallback.java`. The tutorial keeps `defaultTools` for simplicity; the enrichment is what makes the simple `defaultTools` registration still enforce the clarification policy.
+> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors`. This simplified `defaultTools` version is enough to follow the tutorial. The production code in `AgentConfiguration.java` does the same but via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` – see 3.3.
 
-### 3.3 Verify
+### 3.3 UserVisibleToolCallback – trace, description enrichment, and normalization (production)
+
+The tutorial `defaultTools` works, but the checked-in `AgentConfiguration.java` wraps every tool with `UserVisibleToolCallback`:
+
+```java
+Object askUserQuestionTool = AskUserQuestionTool.builder()
+    .questionHandler(new CommandLineQuestionHandler())
+    .build();
+
+ToolCallback[] visibleTools = java.util.Arrays.stream(
+        ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
+    .map(UserVisibleToolCallback::new)
+    .toArray(ToolCallback[]::new);
+
+return ChatClient.builder(chatModel)
+    .defaultSystem("""
+        You are an interactive CLI assistant.
+        Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
+        """)
+    .defaultToolCallbacks(visibleTools)
+    .defaultAdvisors(new SimpleLoggerAdvisor(), MessageChatMemoryAdvisor.builder(chatMemory).build())
+    .build();
+```
+
+Create `src/main/java/com/example/cliai/agent/UserVisibleToolCallback.java`:
+
+```java
+final class UserVisibleToolCallback implements ToolCallback {
+    private final ToolCallback delegate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    UserVisibleToolCallback(ToolCallback delegate) { this.delegate = delegate; }
+
+    @Override public ToolDefinition getToolDefinition() {
+        ToolDefinition original = delegate.getToolDefinition();
+        if (!original.name().toLowerCase().contains("askuserquestion")) return original;
+        String enriched = original.description()
+            + "\n\nYou MUST use this tool for every question directed at the user. "
+            + "Never ask the user a question in ordinary assistant text. "
+            + "If you need information, a preference, confirmation, or disambiguation, "
+            + "stop and call this tool first. After receiving the tool result, continue with the response."
+            + "\n\nThe tool input must be a JSON object with a \"questions\" array. "
+            + "Each question must contain \"question\", \"header\", \"options\", and \"multiSelect\". "
+            + "The \"questions\" field must always be an array, never a string. "
+            + "Each option must contain \"label\" and \"description\". "
+            + "Example: {\"questions\":[{\"question\":\"Which option do you prefer?\",\"header\":\"Preference\",\"options\":[{\"label\":\"Option A\",\"description\":\"First choice\"},{\"label\":\"Option B\",\"description\":\"Second choice\"}],\"multiSelect\":false}]}";
+        return ToolDefinition.builder().name(original.name()).description(enriched).inputSchema(original.inputSchema()).build();
+    }
+    @Override public String call(String arguments) { return invoke(arguments, () -> delegate.call(normalizeArguments(arguments))); }
+    // normalizeArguments(): wraps flat {"header","options",...} into {"questions":[...]} and fills missing question text
+    // invoke(): prints [Tool] / [Tool arguments] / [Tool result] trace – verified by ToolCallingEvalTest
+}
+```
+
+**Three jobs:**
+
+1. **Visible trace** – `invoke()` prints `[Tool] AskUserQuestionTool` / `[Tool arguments]` / `[Tool result]` – `ToolCallingEvalTest` asserts on this trace with a real `lfm2.5` model.
+2. **Description enrichment** – `getToolDefinition()` keeps the system prompt tool-oblivious but still forces the policy. Without it the stock `AskUserQuestionTool` description (`Tool:AskUserQuestionTool:205` `Use this tool when you need to ask...`) is too weak and `sufficientlyAmbiguousPromptShouldTriggerClarificationTool` flaps.
+3. **Schema normalization** – `normalizeArguments()` repairs the common `{"options":...}` flat payload into the `{"questions":[...]}` shape `CommandLineQuestionHandler` expects.
+
+### 3.4 Verify
 
 ```bash
 mvn spring-boot:run
 # Type: Help me learn Spring AI
 # The AI should ask about your experience level, interests, etc. via AskUserQuestionTool
 # Answer the questions — the AI will tailor its response
-# If the model asks in plain text instead, check that defaultSystem is present (see Common Issues)
+# If the model asks in plain text instead, check: (1) defaultSystem contains "use an available tool to ask - never ask in ordinary assistant text" (3.2) and (2) UserVisibleToolCallback is wired via ToolCallbacks.from(...).map(UserVisibleToolCallback::new) → defaultToolCallbacks (3.3) – see Common Issues
 ```
 
 ---
@@ -390,7 +453,7 @@ import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 
-class CalculatorTool {
+public class CalculatorTool {
 
     private final ExpressionParser parser = new SpelExpressionParser();
 
@@ -399,6 +462,7 @@ class CalculatorTool {
             @ToolParam(description = "The math expression to evaluate") String expression) {
         try {
             StandardEvaluationContext context = new StandardEvaluationContext();
+            context.setVariable("pi", Math.PI);
             var result = parser.parseExpression(expression).getValue(context);
             return result instanceof Number n ? n.doubleValue() : Double.parseDouble(result.toString());
         } catch (Exception e) {
@@ -445,7 +509,7 @@ package com.example.cliai.agent.tools;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
-class UnitConverterTool {
+public class UnitConverterTool {
 
     @Tool(description = "Convert between units. Supports: km/miles, kg/lbs, celsius/fahrenheit, liters/gallons")
     String convert(
@@ -742,17 +806,33 @@ class UnitConverterToolTest {
 
 ### 8.4 AgentConfigurationTest
 
-Create `src/test/java/com/example/cliai/agent/AgentConfigurationTest.java`:
+Create `src/test/java/com/example/cliai/agent/AgentConfigurationTest.java` (verifies tool-oblivious system prompt and enriched tool description – matches checked-in test):
 
 ```java
 package com.example.cliai.agent;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.support.ToolCallbacks;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class AgentConfigurationTest {
 
@@ -760,9 +840,9 @@ class AgentConfigurationTest {
     void shouldCreateChatClientBean() {
         AgentConfiguration config = new AgentConfiguration();
         ChatModel chatModel = mock(ChatModel.class);
-
-        ChatClient chatClient = config.chatClient(chatModel);
-
+        @SuppressWarnings("unchecked")
+        ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider = mock(ObjectProvider.class);
+        ChatClient chatClient = config.chatClient(chatModel, mcpProvider);
         assertThat(chatClient).isNotNull();
     }
 
@@ -770,26 +850,92 @@ class AgentConfigurationTest {
     void shouldCreateDistinctChatClientInstances() {
         AgentConfiguration config = new AgentConfiguration();
         ChatModel chatModel = mock(ChatModel.class);
-
-        ChatClient client1 = config.chatClient(chatModel);
-        ChatClient client2 = config.chatClient(chatModel);
-
+        @SuppressWarnings("unchecked")
+        ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider = mock(ObjectProvider.class);
+        ChatClient client1 = config.chatClient(chatModel, mcpProvider);
+        ChatClient client2 = config.chatClient(chatModel, mcpProvider);
         assertThat(client1).isNotSameAs(client2);
+    }
+
+    @Test
+    void defaultSystemShouldBeToolOblivious() {
+        ChatModel chatModel = mock(ChatModel.class);
+        org.springframework.ai.chat.prompt.ChatOptions opts = org.springframework.ai.chat.prompt.ChatOptions.builder().build();
+        when(chatModel.getDefaultOptions()).thenReturn(opts);
+        when(chatModel.getOptions()).thenReturn(opts);
+        ChatResponse dummy = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))));
+        when(chatModel.call(any(Prompt.class))).thenReturn(dummy);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider = mock(ObjectProvider.class);
+        AgentConfiguration config = new AgentConfiguration();
+        ChatClient chatClient = config.chatClient(chatModel, mcpProvider);
+        chatClient.prompt().user("Hello").advisors(a -> a.param(org.springframework.ai.chat.memory.ChatMemory.CONVERSATION_ID, "test-1")).call().content();
+        ArgumentCaptor<Prompt> captor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(captor.capture());
+        Prompt prompt = captor.getValue();
+        String promptText = prompt.getInstructions().toString() + " " + prompt.getContents();
+        assertThat(promptText).contains("You are an interactive CLI assistant");
+        assertThat(promptText).contains("Be helpful, concise");
+        assertThat(promptText).contains("use an available tool to ask");
+        assertThat(promptText).contains("never ask in ordinary assistant text");
+        assertThat(promptText).doesNotContain("AskUserQuestionTool");
+        assertThat(promptText).doesNotContain("questions array");
+        assertThat(promptText).doesNotContain("The tool input must be a JSON object");
+        assertThat(promptText).doesNotContain("\"questions\"");
+    }
+
+    @Test
+    void askUserQuestionToolDescriptionShouldContainUsagePolicyAndSchema() {
+        ToolCallback delegate = ToolCallbacks.from(
+            org.springaicommunity.agent.tools.AskUserQuestionTool.builder()
+                .questionHandler(questions -> java.util.Map.of())
+                .build()
+        )[0];
+        ToolCallback wrapped = new UserVisibleToolCallback(delegate);
+        String description = wrapped.getToolDefinition().description();
+        assertThat(description).contains("You MUST use this tool for every question");
+        assertThat(description).contains("Never ask the user a question in ordinary assistant text");
+        assertThat(description).contains("questions");
+        assertThat(description).contains("header");
+        assertThat(description).contains("multiSelect");
+        assertThat(description).contains("label");
+        assertThat(description).contains("{\"questions\"");
+    }
+
+    @Test
+    void tutorialStep3MustDocumentToolDescriptionPolicy() throws Exception {
+        Path tutorial = Path.of("").toAbsolutePath().resolve("TUTORIAL.md");
+        if (!Files.exists(tutorial)) tutorial = Path.of("../TUTORIAL.md").toAbsolutePath().normalize();
+        if (!Files.exists(tutorial)) tutorial = Path.of("../../TUTORIAL.md").toAbsolutePath().normalize();
+        assertThat(Files.exists(tutorial)).as("TUTORIAL.md must exist").isTrue();
+        String content = Files.readString(tutorial);
+        assertThat(content).contains("Why registration alone is not enough");
+        assertThat(content).contains("tool-oblivious");
+        assertThat(content).contains("UserVisibleToolCallback");
+        assertThat(content).contains("MUST use this tool for every question");
+        assertThat(content).contains("UserVisibleToolCallback – trace, description enrichment, and normalization");
+        assertThat(content).contains("You are an interactive CLI assistant.");
+        assertThat(content).contains("Be helpful, concise");
+        assertThat(content).contains("use an available tool to ask");
+        assertThat(content).contains("never ask in ordinary assistant text");
     }
 }
 ```
 
 ### 8.5 ChatLoopTest
 
-Create `src/test/java/com/example/cliai/cli/ChatLoopTest.java`:
+Create `src/test/java/com/example/cliai/cli/ChatLoopTest.java` (covers `/help`/`/tools`/`/clear`, graceful EOF, and streaming – matches checked-in test):
 
 ```java
 package com.example.cliai.cli;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
+import reactor.core.publisher.Flux;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
@@ -805,67 +951,95 @@ class ChatLoopTest {
     void shouldExitOnExitCommand() {
         ChatClient chatClient = mock(ChatClient.class);
         ChatLoop chatLoop = new ChatLoop(chatClient);
-
         InputStream originalIn = System.in;
         try {
-            System.setIn(new ByteArrayInputStream("exit\n".getBytes(StandardCharsets.UTF_8)));
+            String input = "exit\n";
+            System.setIn(new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)));
             chatLoop.run();
             verify(chatClient, never()).prompt();
-        } finally {
-            System.setIn(originalIn);
-        }
+        } finally { System.setIn(originalIn); }
     }
 
     @Test
     void shouldExitOnQuitCommand() {
         ChatClient chatClient = mock(ChatClient.class);
         ChatLoop chatLoop = new ChatLoop(chatClient);
-
         InputStream originalIn = System.in;
         try {
-            System.setIn(new ByteArrayInputStream("quit\n".getBytes(StandardCharsets.UTF_8)));
+            String input = "quit\n";
+            System.setIn(new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)));
             chatLoop.run();
             verify(chatClient, never()).prompt();
-        } finally {
-            System.setIn(originalIn);
-        }
+        } finally { System.setIn(originalIn); }
     }
 
     @Test
-    void shouldCallChatClientOnUserInput() {
+    void shouldExitCleanlyWhenInputEnds() {
+        ChatClient chatClient = mock(ChatClient.class);
+        ChatLoop chatLoop = new ChatLoop(chatClient);
+        InputStream originalIn = System.in;
+        try {
+            System.setIn(new ByteArrayInputStream(new byte[0]));
+            chatLoop.run();
+            verify(chatClient, never()).prompt();
+        } finally { System.setIn(originalIn); }
+    }
+
+    @Test
+    void shouldHandleSlashCommandsWithoutCallingModel() {
+        ChatClient chatClient = mock(ChatClient.class);
+        ChatLoop chatLoop = new ChatLoop(chatClient);
+        InputStream originalIn = System.in;
+        PrintStream originalOut = System.out;
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try {
+            System.setIn(new ByteArrayInputStream("/help\n/tools\n/clear\n/exit\n".getBytes(StandardCharsets.UTF_8)));
+            System.setOut(new PrintStream(output));
+            chatLoop.run();
+            String text = output.toString(StandardCharsets.UTF_8);
+            org.assertj.core.api.Assertions.assertThat(text).contains("/help", "CalculatorTool", "Conversation cleared.", "Goodbye!");
+            verify(chatClient, never()).prompt();
+        } finally { System.setIn(originalIn); System.setOut(originalOut); }
+    }
+
+    @Test
+    void shouldStreamChatClientResponseOnUserInput() {
         ChatClient chatClient = mock(ChatClient.class);
         ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
-        ChatClient.CallResponseSpec responseSpec = mock(ChatClient.CallResponseSpec.class);
-
+        ChatClient.StreamResponseSpec streamSpec = mock(ChatClient.StreamResponseSpec.class);
         when(chatClient.prompt()).thenReturn(requestSpec);
         when(requestSpec.user(any(String.class))).thenReturn(requestSpec);
         when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn("AI response");
-
+        when(requestSpec.stream()).thenReturn(streamSpec);
+        when(streamSpec.content()).thenReturn(Flux.just("AI", " response"));
         ChatLoop chatLoop = new ChatLoop(chatClient);
-
         InputStream originalIn = System.in;
         try {
-            System.setIn(new ByteArrayInputStream("Hello\nexit\n".getBytes(StandardCharsets.UTF_8)));
+            String input = "Hello\nexit\n";
+            System.setIn(new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)));
             chatLoop.run();
-
             verify(chatClient).prompt();
             verify(requestSpec).user("Hello");
-            verify(requestSpec).call();
-            verify(responseSpec).content();
-        } finally {
-            System.setIn(originalIn);
-        }
+            verify(requestSpec).stream();
+            verify(streamSpec).content();
+        } finally { System.setIn(originalIn); }
     }
 }
 ```
+
+### 8.5b UserVisibleToolCallbackTest, ChatClientIntegrationTest, ToolCallingEvalTest
+
+Create these additional tests exactly as in the repo (see `src/test/java/com/example/cliai/agent/UserVisibleToolCallbackTest.java`, `ChatClientIntegrationTest.java`, `ToolCallingEvalTest.java`). They verify: trace/normalization (`wrapsSingleAskUserQuestionInQuestionsArray`), live Ollama `lfm2.5` memory (`shouldRememberContextAcrossTurns`), and tool-calling evals (`calculatorPromptMustExecuteCalculatorTool`, `clarificationPromptMustExecuteAskUserQuestionTool`, `sufficientlyAmbiguousPromptShouldTriggerClarificationTool` – run with `mvn test -Devals=true`).
 
 ### 8.6 Run Tests
 
 ```bash
 mvn test
-# 29 tests should pass
+# 42 tests: 39 unit/integration + 3 evals skipped (run with -Devals=true + Ollama lfm2.5 for evals)
+# e.g. mvn test -Devals=true -Dtest=ToolCallingEvalTest#clarificationPromptMustExecuteAskUserQuestionTool
+
+mvn test -pl backend
+# 10 tests (GraphQL + REST mocked, MCP skipped without -Dmcp.integration)
 ```
 
 ---
@@ -879,6 +1053,7 @@ spring-ai-cli-agent/
 │   ├── Application.java
 │   ├── agent/
 │   │   ├── AgentConfiguration.java
+│   │   ├── UserVisibleToolCallback.java  # trace + tool-description enrichment + normalization
 │   │   └── tools/
 │   │       ├── CalculatorTool.java
 │   │       └── UnitConverterTool.java
@@ -889,14 +1064,53 @@ spring-ai-cli-agent/
 └── src/test/java/com/example/cliai/
     ├── agent/
     │   ├── AgentConfigurationTest.java
+    │   ├── UserVisibleToolCallbackTest.java
     │   └── tools/
     │       ├── CalculatorToolTest.java
     │       └── UnitConverterToolTest.java
     └── cli/
-        └── ChatLoopTest.java
+        ├── ChatLoopTest.java
+        ├── ChatClientIntegrationTest.java   # needs Ollama lfm2.5
+        └── ToolCallingEvalTest.java         # -Devals=true, needs Ollama lfm2.5
 ```
 
 ---
+
+## Complete pom.xml
+
+> Matches `spring-ai-cli-agent/pom.xml` – use this as final state if you followed Steps 1, 3.1, 8.1 incrementally:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>4.1.0</version><relativePath/></parent>
+    <groupId>com.example</groupId><artifactId>spring-ai-cli-agent</artifactId><version>0.0.1-SNAPSHOT</version><name>spring-ai-cli-agent</name><description>Spring AI CLI Agent — Learning Project</description>
+    <properties><java.version>17</java.version><spring-ai.version>2.0.0</spring-ai.version></properties>
+    <dependencyManagement><dependencies><dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-bom</artifactId><version>${spring-ai.version}</version><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement>
+    <dependencies>
+        <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-starter-model-ollama</artifactId></dependency>
+        <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-starter-mcp-client</artifactId></dependency>
+        <dependency><groupId>org.springaicommunity</groupId><artifactId>spring-ai-agent-utils</artifactId><version>0.10.0</version></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+    </dependencies>
+    <build><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
+</project>
+```
+
+## Complete application.properties
+
+```properties
+# Local Ollama endpoint and chat model used by Spring AI.
+# Default is lfm2.5 (5.2 GB, fastest, tools+thinking). Alternatives under 10 GB with tools:
+# qwen3.5:9b (6.6 GB, 256K) and gemma4:e4b (9.6 GB, vision+audio) — see ../../ollama-model-links.md
+spring.ai.ollama.base-url=http://localhost:11434
+spring.ai.ollama.chat.options.model=lfm2.5
+# MCP client is disabled by default so unit tests run without external dependencies.
+spring.ai.mcp.client.enabled=false
+spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
+server.port=8081
+```
 
 ## Complete AgentConfiguration.java
 
@@ -920,42 +1134,145 @@ import org.springframework.context.annotation.Configuration;
 class AgentConfiguration {
 
     @Bean
-    ChatClient chatClient(ChatModel chatModel) {
+    ChatClient chatClient(ChatModel chatModel, ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
             .maxMessages(20)
             .build();
 
-        return ChatClient.builder(chatModel)
+        Object askUserQuestionTool = AskUserQuestionTool.builder()
+            .questionHandler(new CommandLineQuestionHandler())
+            .build();
+
+        ToolCallback[] visibleTools = java.util.Arrays.stream(
+                ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
+            .map(UserVisibleToolCallback::new)
+            .toArray(ToolCallback[]::new);
+
+        ChatClient.Builder builder = ChatClient.builder(chatModel)
             .defaultSystem("""
                 You are an interactive CLI assistant.
-                Be helpful, concise, and use the tools available to you when appropriate.
+                Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
                 """)
-            .defaultTools(
-                AskUserQuestionTool.builder()
-                    .questionHandler(new CommandLineQuestionHandler())
-                    .build(),
-                new CalculatorTool(),
-                new UnitConverterTool()
-            )
+            .defaultToolCallbacks(visibleTools)
             .defaultAdvisors(
                 new SimpleLoggerAdvisor(),
                 MessageChatMemoryAdvisor.builder(chatMemory).build()
-            )
-            .build();
+            );
+
+        mcpProvider.ifAvailable(provider -> builder.defaultTools(provider));
+
+        return builder.build();
     }
 }
 ```
 
-> **Note:** As with Step 3, production code wraps the tools via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` and enriches `AskUserQuestionTool`'s description with the "MUST use for every question…" policy and JSON `{"questions":[...]}` schema/example — the system prompt remains tool-oblivious.
+Production `UserVisibleToolCallback.java` (see 3.3) enriches `AskUserQuestionTool` description with the `MUST/Never` policy + `{"questions":[...]}` schema/example and prints `[Tool]` trace; system prompt stays generic but directive.
+
+## Complete UserVisibleToolCallback.java
+
+> Exactly `src/main/java/com/example/cliai/agent/UserVisibleToolCallback.java` – create this file in Step 3.3 to make the tutorial line-by-line complete:
+
+```java
+package com.example.cliai.agent;
+
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.ai.tool.metadata.ToolMetadata;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
+
+/** Adds a concise, user-visible trace around a tool invocation. */
+final class UserVisibleToolCallback implements ToolCallback {
+
+    private final ToolCallback delegate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    UserVisibleToolCallback(ToolCallback delegate) {
+        this.delegate = delegate;
+    }
+
+    @Override
+    public ToolDefinition getToolDefinition() {
+        ToolDefinition original = delegate.getToolDefinition();
+        if (!original.name().toLowerCase().contains("askuserquestion")) {
+            return original;
+        }
+        String enriched = original.description()
+            + "\n\nYou MUST use this tool for every question directed at the user. "
+            + "Never ask the user a question in ordinary assistant text. "
+            + "If you need information, a preference, confirmation, or disambiguation, "
+            + "stop and call this tool first. After receiving the tool result, continue with the response."
+            + "\n\nThe tool input must be a JSON object with a \"questions\" array. "
+            + "Each question must contain \"question\", \"header\", \"options\", and \"multiSelect\". "
+            + "The \"questions\" field must always be an array, never a string. "
+            + "Each option must contain \"label\" and \"description\". "
+            + "Example: {\"questions\":[{\"question\":\"Which option do you prefer?\",\"header\":\"Preference\","
+            + "\"options\":[{\"label\":\"Option A\",\"description\":\"First choice\"},"
+            + "{\"label\":\"Option B\",\"description\":\"Second choice\"}],\"multiSelect\":false}]}";
+        return ToolDefinition.builder()
+            .name(original.name())
+            .description(enriched)
+            .inputSchema(original.inputSchema())
+            .build();
+    }
+
+    @Override public ToolMetadata getToolMetadata() { return delegate.getToolMetadata(); }
+    @Override public String call(String arguments) { return invoke(arguments, () -> delegate.call(normalizeArguments(arguments))); }
+    @Override public String call(String arguments, ToolContext context) { return invoke(arguments, () -> delegate.call(normalizeArguments(arguments), context)); }
+
+    private String normalizeArguments(String arguments) {
+        if (!getToolDefinition().name().toLowerCase().contains("askuserquestion")) return arguments;
+        try {
+            JsonNode root = objectMapper.readTree(arguments);
+            if (root.isObject() && root.has("options") && !root.has("questions")) {
+                ObjectNode question = (ObjectNode) root.deepCopy();
+                if (!question.has("question")) {
+                    String header = question.path("header").asText("Please choose an option");
+                    question.put("question", header + ". Please choose an option.");
+                }
+                ObjectNode wrapped = objectMapper.createObjectNode();
+                ArrayNode questions = wrapped.putArray("questions");
+                questions.add(question);
+                return objectMapper.writeValueAsString(wrapped);
+            }
+        } catch (Exception ignored) {}
+        return arguments;
+    }
+
+    private String invoke(String arguments, java.util.function.Supplier<String> invocation) {
+        System.out.println("\n[Tool] " + getToolDefinition().name());
+        System.out.println("[Tool arguments] " + arguments);
+        try {
+            String result = invocation.get();
+            System.out.println("[Tool result] " + result);
+            return result;
+        } catch (RuntimeException exception) {
+            System.out.println("[Tool error] " + exception.getMessage());
+            throw exception;
+        }
+    }
+}
+```
+
+### Complete CalculatorTool.java / UnitConverterTool.java
+
+Exactly as in Steps 4.1/5.1 with `public class` and `context.setVariable("pi", Math.PI)` for `CalculatorTool` – copy verbatim to match repo.
 
 ---
 
 ## Complete ChatLoop.java
 
+> The checked-in `ChatLoop.java` is the streaming variant (Step 10 is already applied). It uses `UUID` session IDs, `/help`/`/tools`/`/clear` commands, and `stream().content().doOnNext().blockLast()` for token streaming. If you followed Steps 1-6 literally you have the simpler `call().content()` loop – replace it with this complete file to match the repo:
+
 ```java
 package com.example.cliai.cli;
 
 import java.util.Scanner;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -964,6 +1281,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 class ChatLoop implements CommandLineRunner {
+
+    private static final String SESSION_ID_PREFIX = "session-";
 
     private final ChatClient chatClient;
 
@@ -978,27 +1297,65 @@ class ChatLoop implements CommandLineRunner {
         System.out.println("║   Type 'exit' to quit                ║");
         System.out.println("╚══════════════════════════════════════╝\n");
 
+        AtomicReference<String> sessionId = new AtomicReference<>(SESSION_ID_PREFIX + UUID.randomUUID());
         try (Scanner scanner = new Scanner(System.in)) {
             while (true) {
                 System.out.print("You: ");
+                if (!scanner.hasNextLine()) {
+                    System.out.println("\nGoodbye!");
+                    break;
+                }
                 String input = scanner.nextLine();
-                if ("exit".equalsIgnoreCase(input.trim()) || "quit".equalsIgnoreCase(input.trim())) {
+                String command = input.trim().toLowerCase();
+                if ("exit".equals(command) || "quit".equals(command) || "/exit".equals(command)) {
                     System.out.println("Goodbye!");
                     break;
                 }
+                if ("/help".equals(command)) {
+                    printHelp();
+                    continue;
+                }
+                if ("/tools".equals(command)) {
+                    printTools();
+                    continue;
+                }
+                if ("/clear".equals(command)) {
+                    sessionId.set(SESSION_ID_PREFIX + UUID.randomUUID());
+                    System.out.println("Conversation cleared.\n");
+                    continue;
+                }
 
                 try {
-                    String response = chatClient.prompt()
+                    System.out.print("\nAI: ");
+                    chatClient.prompt()
                         .user(input)
-                        .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "session-1"))
-                        .call()
-                        .content();
-                    System.out.println("\nAI: " + response + "\n");
+                        .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId.get()))
+                        .stream()
+                        .content()
+                        .doOnNext(System.out::print)
+                        .blockLast();
+                    System.out.println("\n");
                 } catch (Exception e) {
                     System.out.println("\n[Error] " + e.getMessage() + "\n");
                 }
             }
         }
+    }
+
+    private void printHelp() {
+        System.out.println("\nCommands:");
+        System.out.println("  /help   Show this help");
+        System.out.println("  /tools  List available tools");
+        System.out.println("  /clear  Start a fresh conversation");
+        System.out.println("  /exit   Exit the CLI");
+        System.out.println("  exit    Exit the CLI\n");
+    }
+
+    private void printTools() {
+        System.out.println("\nAvailable tools:");
+        System.out.println("  CalculatorTool      Evaluate mathematical expressions");
+        System.out.println("  UnitConverterTool   Convert supported units");
+        System.out.println("  AskUserQuestionTool Let the agent ask a clarifying question\n");
     }
 }
 ```
