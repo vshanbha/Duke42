@@ -1,8 +1,10 @@
 # Blueprint: Spring AI — Learning Path & Project
 
-**Goal**: Build a general-purpose AI assistant that teaches Spring AI concepts step by step
-**End products**: A CLI agent (terminal) + a Vaadin web UI (browser) + a REST API (for JS devs)
-**Stack**: Spring Boot 4 + Spring AI 2.0 + Ollama (local, free, no API keys) + Vaadin 25
+**Goal**: Build a general-purpose AI assistant that teaches Spring AI concepts step by step — now covering the full `docs.spring.io/spring-ai/reference/index.html` surface
+**End products**: CLI agent (terminal, streaming + thinking) + Vaadin web UI (browser, streaming) + REST/GraphQL API (for JS) + MCP client (polyglot)
+**Stack**: Spring Boot 4 + Spring AI 2.0 + Ollama (local, free, no API keys) + Vaadin 25 + PgVector/Chroma (VectorStore) + Micrometer (Observability)
+
+> **Reference map:** This blueprint tracks `Spring AI Reference` top-level: `Chat Client API`, `Prompts`, `Structured Output`, `Multimodality`, `Models` (Chat/Embedding/Image/Audio/Moderation), `Chat Memory`, `Tool Calling`, `MCP`, `RAG`, `Vector Databases`, `Evaluation`, `Observability`, `Dev-time Services`, `Testing`.
 
 ---
 
@@ -15,30 +17,27 @@
 | Java | 17+ | Runtime |
 | Maven | 3.6+ | Build |
 | Ollama | Latest | Local LLM runtime |
+| Docker | Latest | For `pgvector` + `OllamaContainer` testcontainers |
 
 ### Ollama setup
 
 ```bash
-# Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull a model that supports tool calling
-ollama pull lfm2.5
-
-# Verify it works
-ollama run lfm2.5 "Say hello"
+ollama pull gemma4:e4b        # default CLI, 9.6 GB, tools+thinking+vision+audio — or gemma4:e4b-mlx on Mac
+ollama pull lfm2.5            # alternative 5.2 GB, fastest — still in ollama-model-links.md
+ollama run gemma4:e4b "Say hello"
 ```
 
 ### Why Ollama?
 
-- **Free**: No API keys, no usage limits, no billing
+- **Free**: No API keys, no billing
 - **Private**: Everything runs on your machine
 - **Fast**: No network latency for local models
-- **Tool calling**: `lfm2.5` (default, 5.2 GB), `qwen3.5:9b` (6.6 GB) and `gemma4:e4b` (9.6 GB) support function calling — full $<10$ GB comparison in [`ollama-model-links.md`](ollama-model-links.md)
+- **Tool calling + thinking**: `gemma4:e4b` (vision+audio) and `qwen3.5:9b` support `tools`+`thinking` — full comparison in [`ollama-model-links.md`](ollama-model-links.md)
 
 ---
 
-## PROJECT STRUCTURE
+## PROJECT STRUCTURE (expanded)
 
 ```
 Duke42/
@@ -47,23 +46,30 @@ Duke42/
 │   ├── src/main/java/com/example/cliai/
 │   │   ├── Application.java
 │   │   ├── agent/
-│   │   │   ├── AgentConfiguration.java
+│   │   │   ├── AgentConfiguration.java      # ChatClient + memory + tools + MCP
+│   │   │   ├── UserVisibleToolCallback.java # pure trace embellishment
 │   │   │   └── tools/
 │   │   │       ├── CalculatorTool.java
-│   │   │       └── UnitConverterTool.java
-│   │   └── cli/
-│   │       └── ChatLoop.java
-│   └── src/test/java/             # 31 tests
+│   │   │       └── UnitConverterTool.java   # later: StructuredOutputConverter
+│   │   ├── cli/
+│   │   │   ├── ChatLoop.java                # streaming + thinking + SlashCommandHandler
+│   │   │   ├── SlashCommand.java            # command pattern interface
+│   │   │   └── SlashCommandHandler.java     # registry /help,/tools,/clear,/think,/exit
+│   │   └── rag/
+│   │       ├── RagConfiguration.java        # VectorStore + EmbeddingModel + ETL
+│   │       └── IngestionService.java
+│   └── src/test/java/             # 46 tests (ChatClientIntegration, ToolCallingEval with gemma4:e4b-mlx)
 │
-├── backend/                       # Enterprise demo (Vaadin + REST + MCP)
+├── backend/                       # Enterprise demo (Vaadin + REST + GraphQL + MCP)
 │   ├── pom.xml
 │   ├── src/main/java/com/example/edge/
 │   │   ├── Application.java
 │   │   ├── EdgeConfiguration.java
 │   │   ├── EdgeController.java
+│   │   ├── ChatService.java       # chat + chatStream + ragChat
 │   │   └── ui/
-│   │       ├── ChatView.java     # Vaadin web UI
-│   │       └── ChatService.java  # Wraps ChatClient
+│   │       ├── ChatView.java      # Vaadin streaming + thinking indicator
+│   │       └── ChatService.java
 │   └── src/main/resources/
 │       └── application.properties
 │
@@ -71,510 +77,188 @@ Duke42/
 │   └── src/main/java/com/example/
 │       └── SentimentScoringResource.java
 │
+├── docker-compose.yml             # pgvector + ollama for dev-time services
+│
 └── BLUEPRINT-CLI-Agent.md         # This file
 ```
 
-### Architecture
+### Architecture (expanded)
 
 ```
 ┌──────────────────────────────────────────────────┐
-│         Backend (Spring Boot, port 8080)          │
-│                                                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌──────────┐ │
-│  │  Vaadin UI  │  │  REST API   │  │  MCP     │ │
-│  │  /chat      │  │  /edge/*    │  │  Client  │ │
-│  │  (browser)  │  │  (for JS    │  │  (polyglot│ │
-│  │             │  │   devs)     │  │   MCP)   │ │
-│  └──────┬──────┘  └──────┬──────┘  └────┬─────┘ │
-│         │                │              │        │
-│         └────────────────┼──────────────┘        │
-│                          │                       │
-│                   ┌──────┴──────┐                │
-│                   │ Spring AI   │                │
-│                   │ ChatClient  │                │
-│                   │ + Memory    │                │
-│                   │ + Tools     │                │
-│                   └──────┬──────┘                │
-│                          │                       │
-│                   ┌──────┴──────┐                │
-│                   │   Ollama    │                │
-│                   └─────────────┘                │
-└──────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────┐
-│      CLI Agent (Spring Boot, port 8081)           │
-│      Terminal REPL, separate module               │
-└──────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────┐
-│      Polyglot MCP Server (Quarkus, port 9000)     │
-│      Python sentiment analysis via GraalPy        │
+│         Backend (port 8080) + CLI (8081)          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
+│  │ Vaadin   │  │ REST/    │  │ MCP      │       │
+│  │  /chat   │  │ GraphQL  │  │ Client   │       │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘       │
+│       └─────────────┼─────────────┘             │
+│                ┌────┴─────┐                     │
+│                │ ChatClient│ ← Prompts (System/User, PromptTemplate, ChatOptions)
+│                │ + Advisors│ ← Memory + SimpleLogger + ToolCallingAdvisor
+│                │ + Tools   │ ← AskUserQuestion + Calculator + MCP tools
+│                │ + RAG     │ ← ETL → VectorStore (PgVector) + EmbeddingModel
+│                └────┬─────┘                     │
+│                     │                           │
+│              ┌──────┴──────┐  ┌──────────┐     │
+│              │  Ollama     │  │Observability│  │
+│              │ gemma4:think│  │ Micrometer │   │
+│              └─────────────┘  └──────────┘     │
 └──────────────────────────────────────────────────┘
 ```
 
 ---
 
-## LEARNING PATH (7 STEPS)
-
-Each step adds one concept. At every step, the project compiles and runs.
-
----
-
-### STEP 1: Basic ChatClient
-
-**Concept**: ChatClient is to LLMs what JdbcTemplate is to databases — a fluent API that
-sends prompts and gets responses.
-
-**What you'll build**: A CLI loop that sends user input to the LLM and prints the response.
-
-**Key files**:
-
-`pom.xml` — dependencies:
-
-```xml
-<parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.0.0</version>
-</parent>
-
-<properties>
-    <java.version>17</java.version>
-    <spring-ai.version>2.0.0</spring-ai.version>
-</properties>
-
-<dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-bom</artifactId>
-            <version>${spring-ai.version}</version>
-            <type>pom</type>
-            <scope>import</scope>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
-
-<dependencies>
-    <dependency>
-        <groupId>org.springframework.ai</groupId>
-        <artifactId>spring-ai-starter-model-ollama</artifactId>
-    </dependency>
-</dependencies>
-```
-
-`application.properties`:
-
-```properties
-spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=lfm2.5
-```
-
-`Application.java`:
-
-```java
-@SpringBootApplication
-public class Application {
-    public static void main(String[] args) {
-        SpringApplication.run(Application.class, args);
-    }
-}
-```
-
-`AgentConfiguration.java`:
-
-```java
-@Configuration
-class AgentConfiguration {
-
-    @Bean
-    ChatClient chatClient(ChatModel chatModel) {
-        return ChatClient.builder(chatModel).build();
-    }
-}
-```
-
-`ChatLoop.java`:
-
-```java
-@Component
-class ChatLoop implements CommandLineRunner {
-
-    private final ChatClient chatClient;
-
-    ChatLoop(ChatClient chatClient) {
-        this.chatClient = chatClient;
-    }
-
-    @Override
-    public void run(String... args) {
-        System.out.println("AI Agent (type 'exit' to quit)\n");
-        try (Scanner scanner = new Scanner(System.in)) {
-            while (true) {
-                System.out.print("You: ");
-                String input = scanner.nextLine();
-                if ("exit".equalsIgnoreCase(input.trim())) break;
-
-                String response = chatClient.prompt()
-                    .user(input)
-                    .call()
-                    .content();
-                System.out.println("AI: " + response + "\n");
-            }
-        }
-    }
-}
-```
-
-**Verify**:
-```bash
-mvn spring-boot:run
-# Type: What is 2+2?
-# You should get a response from the LLM
-```
-
----
-
-### STEP 2: Chat Memory
-
-**Concept**: Advisors are like AOP aspects — they wrap AI calls with cross-cutting behavior.
-`MessageChatMemoryAdvisor` adds conversation history so the AI remembers previous turns.
-
-**What you'll add**: Memory advisor to the ChatClient, conversation ID to track sessions.
-
-**Changes to `AgentConfiguration.java`**:
-
-```java
-@Configuration
-class AgentConfiguration {
-
-    @Bean
-    ChatClient chatClient(ChatModel chatModel) {
-        ChatMemory chatMemory = MessageWindowChatMemory.builder()
-            .maxMessages(20)
-            .build();
-
-        return ChatClient.builder(chatModel)
-            .defaultAdvisors(
-                MessageChatMemoryAdvisor.builder(chatMemory).build()
-            )
-            .build();
-    }
-}
-```
-
-**Changes to `ChatLoop.java`** — add conversation ID:
-
-```java
-String response = chatClient.prompt()
-    .user(input)
-    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "session-1"))
-    .call()
-    .content();
-```
-
-**Verify**:
-```bash
-mvn spring-boot:run
-# Type: My name is Alice
-# Type: What's my name?
-# AI should remember "Alice"
-```
-
----
-
-### STEP 3: AskUserQuestionTool
-
-**Concept**: Tools are like stored procedures — plugins the AI can invoke when it needs
-external data or user input. The AI *decides* when to call them. You don't invoke tools.
-
-`AskUserQuestionTool` lets the AI ask clarifying questions mid-conversation. Without guidance the model will clarify in plain text and `CommandLineQuestionHandler` never fires.
-
-> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. LLMs clarify in plain text unless nudged. That nudge belongs in the **system prompt generically** (`use an available tool to ask - never ask in ordinary assistant text`) without naming `AskUserQuestionTool`, while the tool's own `@Tool` description + `inputSchema` per [Claude spec](https://code.claude.com/docs/en/agent-sdk/user-input#question-format) and [AskUserQuestionTool.md](https://github.com/spring-ai-community/spring-ai-agent-utils/blob/main/spring-ai-agent-utils/docs/AskUserQuestionTool.md) already documents `questions[]:{question,header≤12,options[2-4]{label,description},multiSelect}`. QnA stays a separate first-class tool per [blog](https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool) (`AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()`).
-
-**What you'll add**: AskUserQuestionTool as separate QnA first-class tool with `CommandLineQuestionHandler` + tool-oblivious but directive system prompt.
-
-**New dependency** in `pom.xml`:
-
-```xml
-<dependency>
-    <groupId>org.springaicommunity</groupId>
-    <artifactId>spring-ai-agent-utils</artifactId>
-    <version>0.10.0</version>
-</dependency>
-```
-
-**Changes to `AgentConfiguration.java`**:
-
-```java
-@Configuration
-class AgentConfiguration {
-
-    @Bean
-    ChatClient chatClient(ChatModel chatModel) {
-        ChatMemory chatMemory = MessageWindowChatMemory.builder()
-            .maxMessages(20)
-            .build();
-
-        return ChatClient.builder(chatModel)
-            .defaultSystem("""
-                You are an interactive CLI assistant.
-                Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
-                """)
-            .defaultTools(
-                AskUserQuestionTool.builder()
-                    .questionHandler(new CommandLineQuestionHandler())
-                    .build()
-            )
-            .defaultAdvisors(
-                MessageChatMemoryAdvisor.builder(chatMemory).build()
-            )
-            .build();
-    }
-}
-```
-
-> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors` and stays tool-oblivious but directive. Real production code keeps QnA separate (`qnaCallbacks` from `AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` vs `domainCallbacks` from `Calculator`/`UnitConverter`) and wraps both via `Stream.concat(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` for pure visible `[Tool]` trace – see `UserVisibleToolCallback.java` (3.3 in TUTORIAL, now pure embellishment per docs/spec).
-
-**New imports**:
-
-```java
-import org.springaicommunity.agent.tools.AskUserQuestionTool;
-import org.springaicommunity.agent.utils.CommandLineQuestionHandler;
-```
-
-**Verify**:
-```bash
-mvn spring-boot:run
-# Type: Help me learn Spring AI
-# The AI should ask about your experience level, interests, etc. via AskUserQuestionTool
-# Answer the questions — the AI will tailor its response
-# If it asks in plain text instead, check that defaultSystem is present (see Common Issues)
-```
-
----
-
-### STEP 4: Custom Tool
-
-**Concept**: You can build your own tools by implementing a method annotated with `@Tool`.
-The AI decides when to call based on the tool's description.
-
-**What you'll build**: A simple calculator tool.
-
-**New file `CalculatorTool.java`**:
-
-```java
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.expression.ExpressionParser;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
-
-class CalculatorTool {
-
-    private final ExpressionParser parser = new SpelExpressionParser();
-
-    @Tool(description = "Evaluate a mathematical expression. Supports +, -, *, /, parentheses. Example: (2 + 3) * 4")
-    double calculate(
-            @ToolParam(description = "The math expression to evaluate") String expression) {
-        try {
-            StandardEvaluationContext context = new StandardEvaluationContext();
-            var result = parser.parseExpression(expression).getValue(context);
-            return result instanceof Number n ? n.doubleValue() : Double.parseDouble(result.toString());
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Cannot evaluate: " + expression, e);
-        }
-    }
-}
-```
-
-**Changes to `AgentConfiguration.java`** — register the tool:
-
-```java
-.defaultTools(
-    AskUserQuestionTool.builder()
-        .questionHandler(new CommandLineQuestionHandler())
-        .build(),
-    new CalculatorTool()
-)
-```
-
-**Verify**:
-```bash
-mvn spring-boot:run
-# Type: What is (15 * 7) + 23?
-# AI should call the calculator tool and give you the answer
-```
-
----
-
-### STEP 5: Multiple Tools + Tool Calling Flow
-
-**Concept**: When multiple tools are registered, the AI picks the right one based on the
-user's request. It can even call multiple tools in sequence.
-
-**What you'll add**: A second tool (unit converter) and observe the AI choosing between them.
-
-**New file `UnitConverterTool.java`**:
-
-```java
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-
-class UnitConverterTool {
-
-    @Tool(description = "Convert between units. Supports: km/miles, kg/lbs, celsius/fahrenheit, liters/gallons")
-    String convert(
-            @ToolParam(description = "The value to convert") double value,
-            @ToolParam(description = "Source unit (e.g., km, miles, kg, lbs, celsius, fahrenheit)") String from,
-            @ToolParam(description = "Target unit (e.g., km, miles, kg, lbs, celsius, fahrenheit)") String to) {
-
-        // Conversion logic
-        return switch (from.toLowerCase() + "->" + to.toLowerCase()) {
-            case "km->miles" -> value * 0.621371 + " miles";
-            case "miles->km" -> value * 1.60934 + " km";
-            case "kg->lbs" -> value * 2.20462 + " lbs";
-            case "lbs->kg" -> value / 2.20462 + " kg";
-            case "celsius->fahrenheit" -> (value * 9/5 + 32) + " °F";
-            case "fahrenheit->celsius" -> (value - 32) * 5/9 + " °C";
-            case "liters->gallons" -> value * 0.264172 + " gallons";
-            case "gallons->liters" -> value * 3.78541 + " liters";
-            default -> "Unsupported conversion: " + from + " to " + to;
-        };
-    }
-}
-```
-
-**Register in `AgentConfiguration.java`**:
-
-```java
-.defaultTools(
-    AskUserQuestionTool.builder()
-        .questionHandler(new CommandLineQuestionHandler())
-        .build(),
-    new CalculatorTool(),
-    new UnitConverterTool()
-)
-```
-
-**Verify**:
-```bash
-mvn spring-boot:run
-# Type: Convert 100 km to miles
-# AI calls UnitConverterTool
-# Type: What is 15 * 7?
-# AI calls CalculatorTool
-# Type: If I drive 100 km at 60 mph, how long does it take in minutes?
-# AI calls both tools in sequence
-```
-
----
-
-### STEP 6: Advisors — Logging
-
-**Concept**: Advisors wrap around every AI call. A logging advisor shows you what's being
-sent to the model and what comes back — invaluable for debugging.
-
-**What you'll add**: A simple logging advisor.
-
-**Changes to `AgentConfiguration.java`**:
-
-```java
-.defaultAdvisors(
-    new SimpleLoggerAdvisor(),  // logs prompts and responses
-    MessageChatMemoryAdvisor.builder(chatMemory).build()
-)
-```
-
-**New import**:
-
-```java
-import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-```
-
-**Verify**:
-```bash
-mvn spring-boot:run
-# Type anything
-# You'll see the full prompt and response logged to console
-```
-
-**Note**: `SimpleLoggerAdvisor` is built into Spring AI. For production, you'd use a
-proper logging framework. This step teaches you how advisors compose.
-
----
-
-### STEP 7: Packaging as Executable Jar
-
-**Concept**: Spring Boot's Maven plugin packages your app as a self-contained executable jar.
-No servlet container needed — it runs as a CLI application.
-
-**Changes to `pom.xml`** — add build plugin:
-
-```xml
-<build>
-    <plugins>
-        <plugin>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-maven-plugin</artifactId>
-        </plugin>
-    </plugins>
-</build>
-```
-
-**Build and run**:
-
-```bash
-# Build the executable jar
-mvn clean package -DskipTests
-
-# Run it
-java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
-```
-
-**Optional: GraalVM Native Image** (advanced, truly native binary):
-
-```xml
-<plugin>
-    <groupId>org.graalvm.buildtools</groupId>
-    <artifactId>native-maven-plugin</artifactId>
-</plugin>
-<plugin>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-maven-plugin</artifactId>
-    <configuration>
-        <image>
-            <builder>paketobuildpacks/builder-jammy-java:latest</builder>
-        </image>
-    </configuration>
-</plugin>
-```
-
-```bash
-mvn native:compile -DskipTests
-./target/spring-ai-cli-agent
-```
-
-**Note**: Native image requires GraalVM JDK and may not work with all tools out of the box.
-Start with the regular jar.
+## LEARNING PATH (15 STEPS) — each step: Concept → What you'll build → Key files → Verify
+
+### STEP 1: Basic ChatClient (Chat Client API)
+
+**Concept**: `ChatClient` is `JdbcTemplate` for LLMs — fluent `prompt().user().call().content()` vs `ChatModel.call(Prompt)`. `ChatClient` adds advisors, tools, memory.
+
+**What you'll build**: CLI loop `You: → AI:` via `ChatClient` (no memory/tools).
+
+**Key files**: `pom.xml` (`spring-ai-starter-model-ollama` via `spring-ai-bom:2.0.0`), `application.properties` (`spring.ai.ollama.base-url`, `spring.ai.ollama.chat.options.model=gemma4:e4b`), `Application.java`, `AgentConfiguration.java` (`ChatClient.builder(chatModel).build()`), `ChatLoop.java` (simple `Scanner` loop, later: `SlashCommandHandler`).
+
+**Verify**: `mvn spring-boot:run` → `What is 2+2?`
+
+### STEP 2: Prompts (System/User/Assistant, PromptTemplate, ChatOptions)
+
+**Concept**: `Prompts` = `SystemMessage` (who AI is) + `UserMessage` (task) + `AssistantMessage` (history). `PromptTemplate` + `ChatOptions` (`temperature`, `topP`, `model`) override per-request.
+
+**What you'll build**: Templated `You are a {role}...` system prompt + per-call `ChatOptions` (`temperature 0.7` vs `0.2`).
+
+**Key files**: `AgentConfiguration.java` (`defaultSystem` with `PromptTemplate` placeholder), `ChatLoop.java` (`chatClient.prompt().system("You are a {role}").user("...").options(OllamaChatOptions.builder().temperature(0.7).build())`).
+
+**Verify**: Change `role=travel assistant` vs `math tutor` and see style shift; `temperature 0.9` vs `0.2` diversity.
+
+### STEP 3: Chat Memory (Chat Memory)
+
+**Concept**: Advisors as AOP — `MessageChatMemoryAdvisor` injects history via `ChatMemory` (`MessageWindowChatMemory`) + `CONVERSATION_ID`.
+
+**What you'll build**: `MessageWindowChatMemory(20)` + `sessionId = "session-"+UUID`.
+
+**Verify**: `My name is Alice` → `What's my name?` → `Alice`.
+
+### STEP 4: AskUserQuestionTool (Tool Calling – QnA)
+
+**Concept**: Tools as stored procedures — AI decides via `@Tool(description)`. `AskUserQuestionTool` per `spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool` + `AskUserQuestionTool.md` + Claude spec `questions[]:{question,header≤12,options[2-4]{label,description},multiSelect}`.
+
+**What you'll build**: `AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` as separate first-class tool + tool-oblivious but directive `defaultSystem` (`use an available tool to ask - never ask...`).
+
+**Verify**: `Help me learn Spring AI` → tool asks `Header: question` `1. label - desc`.
+
+### STEP 5: Custom Tools (Tool Calling – @Tool)
+
+**Concept**: `@Tool(description="...")` + `@ToolParam` → `ToolCallbacks.from(new CalculatorTool())`. `description` is selection hint.
+
+**What you'll build**: `CalculatorTool` (`SpEL` `StandardEvaluationContext` `pi`).
+
+**Verify**: `(15 * 7) + 23` → `128.0` via `[Tool] calculate`.
+
+### STEP 6: Multiple Tools (Tool Calling – selection)
+
+**Concept**: AI picks via `description` among `AskUserQuestion`, `Calculator`, `UnitConverter`; can chain.
+
+**What you'll build**: `UnitConverterTool` (`km/miles` etc.) + `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` pure trace (no `if-else`).
+
+**Verify**: `Convert 100 km to miles` → `UnitConverter`, `If I drive 100 km at 60 mph...` → both.
+
+### STEP 7: Structured Output (Structured Output)
+
+**Concept**: `Structured Output` — `BeanOutputConverter<T>` + JSON Schema (`@JsonProperty(required=true)`) vs free text. Ollama `format="json"` vs `outputSchema`.
+
+**What you'll build**: `UnitConversion` record → `BeanOutputConverter<UnitConversion>.getJsonSchema()` → `OllamaChatOptions.builder().outputSchema(converter.getJsonSchema())` for `convert`.
+
+**Verify**: `Convert 100 km` returns `{"value":62.14,"unit":"miles"}` validated.
+
+### STEP 8: Multimodality (Multimodality, Models – Vision/Audio)
+
+**Concept**: `Multimodality` — `UserMessage(Media(MimeType, Resource))` for `gemma4:e4b` vision+audio.
+
+**What you'll build**: `ChatLoop` `/image /tmp/pic.jpg What do you see?` → `new UserMessage("...", new Media(MimeTypeUtils.IMAGE_PNG, new FileSystemResource(path)))`.
+
+**Verify**: Image of bananas → `basket with bananas...`.
+
+### STEP 9: Models – Chat/Embedding/Image/Audio/Moderation
+
+**Concept**: `Models` — `ChatModel` (`OllamaChatModel`), `EmbeddingModel` (`OllamaEmbeddingModel`), plus `Image/Audio/Moderation` (OpenAI). `ChatModelsComparison`.
+
+**What you'll build**: Switch `OllamaModel` (`gemma4:e4b` vs `lfm2.5`) via `ChatOptions`, `Moderation` filter before `ChatClient`.
+
+**Verify**: `gemma4:e4b` vision works, `lfm2.5` fastest 1B active.
+
+### STEP 10: RAG + Vector Databases (RAG, ETL, VectorStore)
+
+**Concept**: `RAG` = `ETL` (`TextReader` → `TokenTextSplitter` → `EmbeddingModel` → `VectorStore`) + `Retrieval` (`VectorStoreSimilarityRetriever` as `Advisor`). `Vector Databases` — `PgVector`, `Chroma`, `Milvus` etc.
+
+**What you'll build**: `docker-compose.yml` `pgvector:16`, `RagConfiguration.java` (`PgVectorStore`, `OllamaEmbeddingModel`), `IngestionService` (`TextReader` docs → `VectorStore.add`), `ChatClient` `defaultAdvisors(RagAdvisor)`.
+
+**Verify**: Ingest `TUTORIAL.md` → `What does AskUserQuestionTool do?` → answer cites `questions[]` from `TUTORIAL.md`.
+
+### STEP 11: MCP (Model Context Protocol)
+
+**Concept**: `MCP` — client discovers remote tools via `SyncMcpToolCallbackProvider` (SSE `polyglot:9000`).
+
+**What you'll build**: `spring-ai-starter-mcp-client` (no `<version>` via `spring-ai-bom`), `AgentConfiguration` `mcpProvider.ifAvailable(b -> b.defaultTools(provider))`, `application.properties` `spring.ai.mcp.client.enabled=false` / `sse.connections.polyglot.url`.
+
+**Verify**: `polyglot` `java -jar polyglot-runner.jar` + `spring.ai.mcp.client.enabled=true` → `sentiment` tool via `ToolCallingEvalTest`.
+
+### STEP 12: Streaming (ChatClient streaming)
+
+**Concept**: `ChatClient` `.stream().content()` vs `.call().content()`; Vaadin `Flux<String>` + `UI.access()`.
+
+**What you'll build**: `ChatLoop` `stream().chatResponse().doOnNext(cr -> {thinking = metadata.get("thinking")})` + thinking indicator.
+
+**Verify**: `mvn spring-boot:run` tokens stream, `Vaadin` `ChatView` background thread.
+
+### STEP 13: Thinking Mode (Models – Reasoning)
+
+**Concept**: Ollama `Thinking Mode` (`OllamaChatOptions.enableThinking()`, `spring.ai.ollama.chat.think=medium`, metadata `thinking`/`reasoningContent` per `ollama-chat.html#_thinking_mode_reasoning` and `#_reasoning_content_via_openai_compatibility`).
+
+**What you'll build**: `application.properties` `spring.ai.ollama.chat.think=medium`, `ChatLoop` `/think` + `Thinking...` indicator + `[Thinking] <content>` from `ChatResponse.getResult().getMetadata().get("thinking")`.
+
+**Verify**: `Explain quantum entanglement` → `[Thinking] ...` then `AI: ...` with `gemma4:e4b-mlx`.
+
+### STEP 14: Observability (Observability)
+
+**Concept**: `Observability` — `Micrometer` `ChatModelObservationConvention` vs `SimpleLoggerAdvisor`. `Micrometer Tracing` + `Metrics`.
+
+**What you'll build**: Replace `SimpleLoggerAdvisor` with `ObservationAdvisor` + `Micrometer` `MeterRegistry`, view `actuator/metrics`.
+
+**Verify**: `curl localhost:8080/actuator/metrics` shows `gen_ai.client.token.usage`.
+
+### STEP 15: Testing & Evaluation (Testing, Testcontainers, Evaluation)
+
+**Concept**: `Testing` — `spring-ai-spring-boot-testcontainers` + `OllamaContainer` `@ServiceConnection` per `testcontainers.html`; `Evaluation` — `LLM-as-a-Judge` (`Testcontainers` `ollama` + `EvaluationRequest`).
+
+**What you'll build**: `pom.xml` `spring-ai-spring-boot-testcontainers:2.0.0` + `testcontainers:ollama` (test scope, already added), `ChatClientIntegrationTest` with `OllamaContainer` `@ServiceConnection`, `ToolCallingEvalTest` (`-Devals=true`) as `LLM-as-a-Judge` (trace contains `[Tool] AskUserQuestionTool`).
+
+**Verify**: `mvn test` (mocked, no Ollama) → 46 tests; `mvn test -Devals=true` (real `gemma4:e4b-mlx`) → 3 evals PASS; `mvn test -Dmcp.integration=true` (polyglot `9000`).
 
 ---
 
 ## FINAL PROJECT STATE
 
-After all 7 steps, the project has:
+After all 15 steps, the project has:
 
-| Feature | Concept Taught |
-|---|---|
-| ChatClient with Ollama | Spring AI basics, ChatModel auto-configuration |
-| Chat memory | Advisors, conversation persistence |
-| AskUserQuestionTool | Tool calling, user interaction |
-| CalculatorTool | Custom tools with `@Tool` |
-| UnitConverterTool | Multiple tools, AI tool selection |
-| SimpleLoggerAdvisor | Advisor composition |
-| Executable jar | Spring Boot packaging |
+| Feature | Concept Taught | Docs Reference |
+|---|---|---|
+| ChatClient + Ollama | Chat Client API, ChatModel auto-configuration | `chatclient.html` |
+| Prompts | System/User/Assistant, PromptTemplate, ChatOptions | `prompt.html` |
+| Chat memory | Advisors, ChatMemory | `chat-memory.html` |
+| AskUserQuestionTool | Tool Calling (QnA), user interaction | `spring.io/blog/2026/01/16/...` + `AskUserQuestionTool.md` |
+| Calculator/UnitConverter | Custom Tools, Tool selection | `tools.html` |
+| Structured Output | BeanOutputConverter, JSON Schema | `structured-output.html` |
+| Multimodality | Media, vision+audio | `multimodality.html` |
+| Models | Chat/Embedding/Image/Audio/Moderation | `chat/ollama-chat.html`, `comparison.html` |
+| RAG + PgVector | ETL, VectorStore, EmbeddingModel | `retrieval-augmented-generation.html`, `vectordbs/pgvector.html` |
+| MCP | SyncMcpToolCallbackProvider | `mcp/mcp-overview.html` |
+| Streaming | Flux<ChatResponse> | `chatclient.html#streaming` |
+| Thinking | OllamaChatOptions.enableThinking(), reasoningContent | `ollama-chat.html#_thinking_mode_reasoning` |
+| Observability | Micrometer | `observability/index.html` |
+| Dev-time Services | Docker Compose, Testcontainers | `docker-compose.html`, `testcontainers.html` |
+| Packaging + Tests | Executable jar, 46 tests + evals | `spring-boot:run`, `testcontainers.html`, `testing/evaluation` |
 
-### `pom.xml` (complete)
+### `pom.xml` (complete, CLI)
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -583,166 +267,44 @@ After all 7 steps, the project has:
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
         https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.0</version>
-        <relativePath/>
-    </parent>
-
-    <groupId>com.example</groupId>
-    <artifactId>spring-ai-cli-agent</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>spring-ai-cli-agent</name>
-    <description>Spring AI CLI Agent — Learning Project</description>
-
-    <properties>
-        <java.version>17</java.version>
-        <spring-ai.version>2.0.0</spring-ai.version>
-    </properties>
-
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.ai</groupId>
-                <artifactId>spring-ai-bom</artifactId>
-                <version>${spring-ai.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
+    <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>4.1.0</version><relativePath/></parent>
+    <groupId>com.example</groupId><artifactId>spring-ai-cli-agent</artifactId><version>0.0.1-SNAPSHOT</version>
+    <properties><java.version>17</java.version><spring-ai.version>2.0.0</spring-ai.version></properties>
+    <dependencyManagement><dependencies><dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-bom</artifactId><version>${spring-ai.version}</version><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement>
     <dependencies>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-model-ollama</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springaicommunity</groupId>
-            <artifactId>spring-ai-agent-utils</artifactId>
-            <version>0.10.0</version>
-        </dependency>
+        <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-starter-model-ollama</artifactId></dependency>
+        <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-starter-mcp-client</artifactId></dependency>
+        <dependency><groupId>org.springaicommunity</groupId><artifactId>spring-ai-agent-utils</artifactId><version>0.10.0</version></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+        <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-spring-boot-testcontainers</artifactId><scope>test</scope></dependency>
+        <dependency><groupId>org.testcontainers</groupId><artifactId>ollama</artifactId><scope>test</scope></dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
+    <build><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
 </project>
 ```
 
-### `application.properties` (complete)
+### `application.properties` (complete, CLI)
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=lfm2.5
+spring.ai.ollama.chat.options.model=gemma4:e4b
+spring.ai.ollama.chat.think=medium
+spring.ai.mcp.client.enabled=false
+spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
+server.port=8081
 ```
 
-### `AgentConfiguration.java` (complete)
+### `docker-compose.yml` (dev-time services)
 
-```java
-package com.example.cliai.agent;
-
-import org.springaicommunity.agent.tools.AskUserQuestionTool;
-import org.springaicommunity.agent.utils.CommandLineQuestionHandler;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-class AgentConfiguration {
-
-    @Bean
-    ChatClient chatClient(ChatModel chatModel) {
-        ChatMemory chatMemory = MessageWindowChatMemory.builder()
-            .maxMessages(20)
-            .build();
-
-        return ChatClient.builder(chatModel)
-            .defaultSystem("""
-                You are an interactive CLI assistant.
-                Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
-                """)
-            .defaultTools(
-                AskUserQuestionTool.builder()
-                    .questionHandler(new CommandLineQuestionHandler())
-                    .build(),
-                new CalculatorTool(),
-                new UnitConverterTool()
-            )
-            .defaultAdvisors(
-                new SimpleLoggerAdvisor(),
-                MessageChatMemoryAdvisor.builder(chatMemory).build()
-            )
-            .build();
-    }
-}
-```
-
-> **Note:** Production code keeps QnA separate (`AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` → `defaultTools(askTool)`) and domain tools via `ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool()).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks`; `UserVisibleToolCallback` is pure trace embellishment (`[Tool]`/`[Tool arguments]`/`[Tool result]`) – no `if (name.contains(...))` AoP branching, no normalization wrapper.
-
-### `ChatLoop.java` (complete)
-
-```java
-package com.example.cliai.cli;
-
-import java.util.Scanner;
-
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.stereotype.Component;
-
-@Component
-class ChatLoop implements CommandLineRunner {
-
-    private final ChatClient chatClient;
-
-    ChatLoop(ChatClient chatClient) {
-        this.chatClient = chatClient;
-    }
-
-    @Override
-    public void run(String... args) {
-        System.out.println("\n╔══════════════════════════════════════╗");
-        System.out.println("║   Spring AI CLI Agent                ║");
-        System.out.println("║   Type 'exit' to quit                ║");
-        System.out.println("╚══════════════════════════════════════╝\n");
-
-        try (Scanner scanner = new Scanner(System.in)) {
-            while (true) {
-                System.out.print("You: ");
-                String input = scanner.nextLine();
-                if ("exit".equalsIgnoreCase(input.trim()) || "quit".equalsIgnoreCase(input.trim())) {
-                    System.out.println("Goodbye!");
-                    break;
-                }
-
-                try {
-                    String response = chatClient.prompt()
-                        .user(input)
-                        .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "session-1"))
-                        .call()
-                        .content();
-                    System.out.println("\nAI: " + response + "\n");
-                } catch (Exception e) {
-                    System.out.println("\n[Error] " + e.getMessage() + "\n");
-                }
-            }
-        }
-    }
-}
+```yaml
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+  pgvector:
+    image: pgvector/pgvector:pg16
+    ports: ["5432:5432"]
+    environment: [POSTGRES_DB=vector, POSTGRES_USER=postgres, POSTGRES_PASSWORD=postgres]
 ```
 
 ---
@@ -751,24 +313,25 @@ class ChatLoop implements CommandLineRunner {
 
 ### For learning (step by step)
 
-1. Create the project from scratch, implementing one step at a time
-2. After each step, run `mvn spring-boot:run` and verify
-3. Read the Spring AI docs for the concept you just added
-4. Experiment — change the system prompt, add parameters, break things
+1. Create project from scratch, one step at a time
+2. After each step, `mvn spring-boot:run` and verify
+3. Read Spring AI docs for the concept you just added
+4. Experiment — change system prompt, add parameters, break things
 
 ### For the Baeldung article
 
-The 7 steps map to sections in the article:
-- Steps 1-3 → "Project Setup" + "Building the Agent"
-- Steps 4-5 → "Custom Tools"
-- Step 6 → "Advisors"
-- Step 7 → "Packaging"
+The 15 steps map to sections:
+- Steps 1-3 → "Project Setup" + "Building the Agent" (`ChatClient`, `Prompts`, `Memory`)
+- Steps 4-6 → "Custom Tools" (`AskUserQuestion`, `Calculator`, `UnitConverter`)
+- Steps 7-10 → "Advanced" (`Structured Output`, `Multimodality`, `Models`, `RAG`)
+- Steps 11-15 → "Production" (`MCP`, `Streaming`, `Thinking`, `Observability`, `Testing`)
 
 ### For a downloadable tool
 
-After Step 7, you have a self-contained jar that anyone can run:
+After Step 15, you have a self-contained jar + `docker-compose.yml` for `pgvector`:
 ```bash
 java -jar spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
+docker compose up pgvector ollama
 ```
 
 ---
@@ -777,116 +340,44 @@ java -jar spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 
 | Issue | Fix |
 |---|---|
-| `Connection refused` on Ollama | `ollama serve` must be running |
-| Tool calling doesn't work | Use a model with `tools` support — `lfm2.5` (default, 5.2 GB), `qwen3.5:9b` (6.6 GB) or `gemma4:e4b` (9.6 GB). See [`ollama-model-links.md`](ollama-model-links.md) for the full $<10$ GB comparison |
-| Model asks in plain text, never triggers `AskUserQuestionTool` | QnA not separate / system prompt missing nudge – ensure `AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` separately (STEP 3, `qnaCallbacks` vs `domainCallbacks`) and `defaultSystem` has `use an available tool to ask - never ask...` (tool-oblivious, per Claude spec) |
-| Slow first response | Ollama loads the model into RAM on first call; subsequent calls are fast |
-| `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` or `qwen3.5:4b` (3.4 GB) |
-| Build fails on native image | Skip native for now, use `java -jar` |
+| `Connection refused` on Ollama | `ollama serve` or `docker compose up ollama` or Testcontainers `OllamaContainer` |
+| Tool calling doesn't work | Use `tools` model — `gemma4:e4b` (9.6 GB), `qwen3.5:9b` (6.6 GB), `lfm2.5` (5.2 GB) — see `ollama-model-links.md` |
+| Model asks in plain text | QnA not separate / nudge missing – `AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` + `defaultSystem` `use an available tool to ask - never ask...` |
+| Slow first response | Ollama loads model into RAM first call; next calls fast |
+| `OutOfMemoryError` | Use smaller model: `ollama pull gemma4:e4b` vs `lfm2.5-thinking` 731MB |
+| `pgvector` not found | `docker compose up pgvector` or `spring-boot-docker-compose` |
+| Build fails on native image | Skip native, use `java -jar` |
 
 ---
 
 ## NEXT STEPS (post-tutorial)
 
-After completing this project, consider exploring:
-
-- **Subagent orchestration** — delegate tasks to specialized agents
-- **RAG** — add document retrieval with vector stores
-- **Streaming** — use `.stream()` instead of `.call()` for real-time output
-- **Multi-model** — route different tasks to different models
+After completing this project, consider:
+- **Subagent orchestration** — `spring-ai-agent-utils` `TaskTool` (hierarchical agents)
+- **A2A Integration** — `Agent2Agent` protocol
+- **RAG** already done — add `Evaluation` (LLM-as-a-Judge) for RAG quality
+- **Streaming** already done — add `Thinking` levels `low/medium/high` for `gpt-oss`
+- **Multi-model** — route tasks to different models via `ChatOptions`
 
 ---
 
 ## BACKEND MODULE (Enterprise Demo)
 
-The backend module provides a Vaadin web UI, REST API, and MCP client for enterprise demos.
+See `TUTORIAL.md` Step 10/14 for Vaadin + REST/GraphQL + MCP details.
 
-### Backend Dependencies
+## References (Spring AI Reference index)
 
-```xml
-<parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.0.0</version>
-</parent>
-
-<properties>
-    <java.version>17</java.version>
-    <spring-ai.version>2.0.0</spring-ai.version>
-</properties>
-
-<dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-bom</artifactId>
-            <version>${spring-ai.version}</version>
-            <type>pom</type>
-            <scope>import</scope>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
-
-<dependencies>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>org.springframework.ai</groupId>
-        <artifactId>spring-ai-starter-model-ollama</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>org.springframework.ai</groupId>
-        <artifactId>spring-ai-starter-mcp-client</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>com.vaadin</groupId>
-        <artifactId>vaadin-spring-boot-starter</artifactId>
-        <version>25.2.6</version>
-    </dependency>
-</dependencies>
-```
-
-### Backend application.properties
-
-```properties
-spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=lfm2.5
-spring.ai.mcp.client.enabled=false
-spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
-server.port=8080
-```
-
-### Backend REST Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/edge/infer` | POST | Single-shot LLM inference |
-| `/edge/chat/{chatId}` | POST | Chat with memory (query param: message) |
-| `/edge/toolChat/{chatId}` | POST | Chat with MCP tools (query param: message) |
-
-### Vaadin ChatView (Minimal)
-
-```java
-@Route("chat")
-public class ChatView extends Composite<Div> {
-
-    private final ChatService chatService;
-    private final TextField input = new TextField();
-    private final Div messages = new Div();
-
-    public ChatView(ChatService chatService) {
-        this.chatService = chatService;
-        // Build minimal chat UI
-        // Input field + send button
-        // Message list
-    }
-}
-```
-
-### Backend Tests
-
-```bash
-cd backend && mvn test
-```
+- `Chat Client API` – `chatclient.html`
+- `Prompts` – `prompt.html`
+- `Structured Output` – `structured-output.html`
+- `Multimodality` – `multimodality.html`
+- `Models` – `chat/ollama-chat.html#_thinking_mode_reasoning`, `chat/ollama-chat.html#_reasoning_content_via_openai_compatibility`, `comparison.html`
+- `Chat Memory` – `chat-memory.html`
+- `Tool Calling` – `tools.html`
+- `MCP` – `mcp/mcp-overview.html`
+- `RAG` – `retrieval-augmented-generation.html` + `etl-pipeline.html`
+- `Vector Databases` – `vectordbs/pgvector.html`
+- `Evaluation` – `testing.html`
+- `Observability` – `observability/index.html`
+- `Dev-time Services` – `docker-compose.html`
+- `Testing` – `testcontainers.html` + `testing.html`
