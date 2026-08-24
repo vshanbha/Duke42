@@ -16,28 +16,35 @@ cd polyglot && java -jar target/polyglot-runner.jar  # Polyglot MCP server (port
 
 ### Test Commands
 
+From top level (`Duke42/`):
+
 ```bash
-# CLI Agent tests (39 tests)
+mvn test # all modules: spring-ai-cli-agent 46 + backend 10
+mvn test -pl spring-ai-cli-agent -am # only CLI agent
+mvn test -pl backend -am # only backend
+```
+
+From module:
+
+```bash
+# CLI Agent: 46 tests (43 unit/integration + 3 evals skipped without Ollama)
 cd spring-ai-cli-agent && mvn test
+# opt-in evals with Ollama gemma4:e4b (or gemma4:e4b-mlx via -Dspring.ai.ollama.chat.options.model)
+cd spring-ai-cli-agent && mvn test -Devals=true
 
 # Backend: unit + GraphQL tests only (10 tests; no Ollama required)
 cd backend && mvn test
-
 # Backend full verification: unit tests, package, then E2E via failsafe (4 e2e; requires Ollama)
 cd backend && mvn clean verify
-
-# MCP integration test (requires polyglot on port 9000)
-cd backend && mvn test -Dtest=McpIntegrationTest -Dmcp.integration=true
-
-# Run all tests in a module
-mvn test
+# MCP integration (requires polyglot on port 9000) – no -Dtest needed
+cd backend && mvn test -Dmcp.integration=true # or mvn test -Dmcp.integration=true -pl backend from top level
 ```
 
 ## Module Structure
 
 | Module | Purpose | Port | Tests |
 |--------|---------|------|-------|
-| `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | 39 (unit + integration) |
+| `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | 46 (43 unit/integration + 3 evals skipped) |
 | `backend/` | Enterprise demo (Vaadin + REST + GraphQL + MCP) | 8080 | 14 (10 unit + 4 e2e via failsafe) |
 | `polyglot/` | GraalVM Python integration (MCP server) | 9000 | 3 (integration) |
 | `ui/` | Legacy JavaFX desktop client (optional, not in parent build) | — | — |
@@ -64,15 +71,15 @@ mvn test
 - Backend unit tests use `@SpringBootTest` with Mockito
 - Backend e2e tests start jar as real process, test with Java HTTP client
 - Each test generates unique `chatId` (UUID) for isolation
-- Tests expect Ollama running locally with `lfm2.5` model
-- Spring AI CLI Agent tests use JUnit 5 + AssertJ + Mockito (no Ollama required)
+- Tests expect Ollama running locally with `gemma4:e4b` (Linux/CI, `ollama pull gemma4:e4b`) or `gemma4:e4b-mlx` on Mac (`application-local.properties` or `-Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx`)
+- Spring AI CLI Agent tests use JUnit 5 + AssertJ + Mockito (no Ollama required); evals need Ollama (`-Devals=true`)
 
 ## Environment Requirements
 
 - Java 17+ (for Spring Boot 4)
 - Maven 3.6+
 - GraalVM 21+ (for polyglot module only)
-- Ollama CLI with model: `lfm2.5`
+- Ollama CLI with model: `gemma4:e4b` (or `gemma4:e4b-mlx` on Mac, `lfm2.5` still works but less reliable for AskUserQuestionTool)
 
 ## Common Pitfalls
 

@@ -23,13 +23,14 @@ jobs:
     - name: Install Ollama
       run: curl -fsSL https://ollama.com/install.sh | sh
 
-    - name: Start Ollama and pull model
+    - name: Start Ollama and pull models
       run: |
         ollama serve &
         for i in $(seq 1 30); do
           curl -sf http://localhost:11434/api/tags && break
           sleep 2
         done
+        ollama pull gemma4:e4b
         ollama pull lfm2.5
 
     - name: Build CLI Agent

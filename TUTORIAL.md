@@ -235,11 +235,11 @@ mvn spring-boot:run
 
 ### 1.6 Test Implementation
 
-> Tests start at Step 3, but Step 1 is already covered by `src/test/java/com/example/cliai/cli/ChatClientIntegrationTest.java:24` `shouldGetResponseFromOllama` (real `lfm2.5` via `ChatClient`, no mocks) and `ChatLoopTest.java:22` `shouldExitOnExitCommand` (mocked `ChatClient`, `never().prompt()`). Run after Step 3's `spring-boot-starter-test` is added:
+> Tests start at Step 3, but Step 1 is already covered by `ChatClientIntegrationTest.java:24` `shouldGetResponseFromOllama` (real `gemma4:e4b` via `ChatClient`) and `ChatLoopTest.java:22` `shouldExitOnExitCommand` (mocked `ChatClient`, `never().prompt()`). No specific `-Dtest` needed – general setup:
 
 ```bash
-mvn test -Dtest=ChatClientIntegrationTest#shouldGetResponseFromOllama
-mvn test -Dtest=ChatLoopTest#shouldExitOnExitCommand
+mvn test # top-level Duke42/ or spring-ai-cli-agent/
+# or mvn test -pl spring-ai-cli-agent -am
 ```
 
 ### 1.7 Further Reading
@@ -312,11 +312,11 @@ mvn spring-boot:run
 
 > Added in Step 3.5 (`spring-boot-starter-test`), but verifies Step 2:
 
-* `ChatClientIntegrationTest.java:38` `shouldRememberContextAcrossTurns` – real `lfm2.5` with `ChatMemory.CONVERSATION_ID` (`session-` + `UUID`) – asserts second turn contains `TestUser123`
+* `ChatClientIntegrationTest.java:38` `shouldRememberContextAcrossTurns` – real `gemma4:e4b` with `ChatMemory.CONVERSATION_ID` (`session-` + `UUID`) – asserts second turn contains `TestUser123`
 * `AgentConfigurationTest.java:40` `shouldCreateDistinctChatClientInstances` – `MessageWindowChatMemory` bean distinct per `chatClient()` call
 
 ```bash
-mvn test -Dtest=ChatClientIntegrationTest#shouldRememberContextAcrossTurns
+mvn test # top-level Duke42/ or spring-ai-cli-agent/
 ```
 
 ### 2.5 Further Reading
@@ -439,20 +439,17 @@ void shouldHandleFreeTextWhenNotANumber() { /* Input "my custom answer" → map 
 void shouldBeWiredInAgentConfiguration() { /* CommandLineQuestionHandler implements QuestionHandler */ }
 ```
 
-**Code – `ToolCallingEvalTest` (opt-in, needs Ollama `lfm2.5` – confirms `CommandLineQuestionHandler` was actually *used* end-to-end):**
+**Code – `ToolCallingEvalTest` (opt-in, needs Ollama `gemma4:e4b` – confirms `CommandLineQuestionHandler` was actually *used* end-to-end):**
 
-Create `src/test/java/com/example/cliai/cli/ToolCallingEvalTest.java` (see repo). Mocks `System.in` with `1\n` via `ByteArrayInputStream` and asserts embellished trace:
+Create `src/test/java/com/example/cliai/cli/ToolCallingEvalTest.java` (see repo). Mocks `System.in` with `1\n` via `ByteArrayInputStream` and asserts embellished trace via `UserVisibleToolCallback`:
 
 ```bash
-mvn test -Devals=true -Dtest=ToolCallingEvalTest#clarificationPromptMustExecuteAskUserQuestionTool
-# asserts trace contains "[Tool] AskUserQuestionTool" + "[Tool result]" via UserVisibleToolCallback → proves handler was invoked
-
-mvn test -Devals=true -Dtest=ToolCallingEvalTest#sufficientlyAmbiguousPromptShouldTriggerClarificationTool
-# same, but user prompt is ambiguous "Tell me about Java..." – verifies nudge works without naming tool
+mvn test -Devals=true # top-level Duke42/ – runs ToolCallingEvalTest 3 (clarification + ambiguous) via gemma4:e4b-mlx
+# No -Dtest needed – general setup covers all (ToolCallingEvalTest skipped without -Devals)
 ```
 
 ```bash
-mvn test
+mvn test # top-level
 # Step 3 alone: 12 tests (AgentConfigurationTest 5 + UserVisibleToolCallbackTest 3 + CommandLineQuestionHandlerTest 4) – ToolCallingEvalTest 3 skipped without -Devals
 ```
 
@@ -530,10 +527,10 @@ mvn spring-boot:run
 
 ### 4.4 Test Implementation
 
-* `src/test/java/com/example/cliai/agent/tools/CalculatorToolTest.java:12` – 12 tests (`shouldAddTwoNumbers`, `shouldHandleParentheses`, `shouldThrowOnInvalidExpression` etc., including `pi` via `context.setVariable("pi", Math.PI)`). Created in `Step 8.2` historically, now introduced here:
+* `src/test/java/com/example/cliai/agent/tools/CalculatorToolTest.java:12` – 12 tests (`shouldAddTwoNumbers`, `shouldHandleParentheses`, `shouldThrowOnInvalidExpression` etc., including `pi` via `context.setVariable("pi", Math.PI)`). Historically `Step 8.2`, now introduced here:
 
 ```bash
-mvn test -Dtest=CalculatorToolTest
+mvn test # top-level Duke42/ or spring-ai-cli-agent/
 # 12 tests, SpEL `2 + 3` → `5.0`, `(2+3)*4` → `20.0`, `1/0` → `IllegalArgumentException`
 ```
 
@@ -616,7 +613,7 @@ mvn spring-boot:run
 * `src/test/java/com/example/cliai/agent/tools/UnitConverterToolTest.java:12` – 12 tests (`shouldConvertKmToMiles` `100→62.1371`, `shouldConvertCelsiusToFahrenheit`, `shouldHandleCaseInsensitiveUnits` etc.):
 
 ```bash
-mvn test -Dtest=UnitConverterToolTest
+mvn test # top-level
 # 12 tests, `convert(100,"km","miles")` → `62.1371 miles`, unsupported → `Unsupported conversion`
 ```
 
@@ -1132,14 +1129,15 @@ Create `UserVisibleToolCallbackTest.java` (pure trace `passesArgumentsThroughUnc
 
 ### 8.6 Run Tests
 
-```bash
-mvn test
-# 46 tests: 43 unit/integration + 3 evals skipped (run with -Devals=true + Ollama gemma4:e4b-mlx for evals)
-# e.g. mvn test -Devals=true -Dtest=ToolCallingEvalTest#clarificationPromptMustExecuteAskUserQuestionTool
+From top level (`Duke42/`):
 
-mvn test -pl backend
-# 10 tests (GraphQL + REST mocked, MCP skipped without -Dmcp.integration)
+```bash
+mvn test # 46 tests: 43 unit/integration + 3 evals skipped (add -Devals=true + Ollama gemma4:e4b-mlx for evals)
+mvn test -Devals=true # same as above but runs ToolCallingEvalTest 3 with gemma4:e4b-mlx
+mvn test -pl backend # 10 tests
 ```
+
+No `-Dtest=...` needed – general setup covers all.
 
 ### 8.7 Further Reading
 
@@ -1260,17 +1258,28 @@ spring-ai-cli-agent/
 
 ## Complete application.properties
 
+> Checked-in default is `gemma4:e4b` (Linux/CI-friendly, `ollama pull gemma4:e4b`). For local Mac MLX use `application-local.properties` (see below) or `-Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx`.
+
 ```properties
 # Local Ollama endpoint and chat model used by Spring AI.
-# Default was lfm2.5 (5.2 GB, fastest). Switched to gemma4:e4b-mlx (8.8 GB MLX, more reliable tool-calling) per manual CLI verification – see ../../ollama-model-links.md (model: gemma4:e4b)
+# Checked-in default is gemma4:e4b (Linux/CI-friendly) – see ../../ollama-model-links.md
+# For local Mac (MLX) use gemma4:e4b-mlx via application-local.properties (not committed) or -Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=gemma4:e4b-mlx
+spring.ai.ollama.chat.options.model=gemma4:e4b
 # Thinking: enable model thinking for gemma4/lfm2.5 (tools+thinking). Values: true/false/low/medium/high
-# spring.ai.ollama.chat.think=medium
+# See https://docs.spring.io/spring-ai/reference/api/chat/ollama-chat.html#_thinking_mode_reasoning and #_reasoning_content_via_openai_compatibility
+spring.ai.ollama.chat.think=medium
 # MCP client is disabled by default so unit tests run without external dependencies.
 spring.ai.mcp.client.enabled=false
 spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
 server.port=8081
+```
+
+Create `src/main/resources/application-local.properties` for local Mac (not committed, `**/application-local.properties` in `.gitignore`):
+
+```properties
+# Local override for Mac (MLX) – run with --spring.profiles.active=local
+spring.ai.ollama.chat.options.model=gemma4:e4b-mlx
 ```
 
 ## Complete AgentConfiguration.java
@@ -1620,8 +1629,8 @@ spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
 
 ```bash
 cd polyglot && mvn clean install && java -jar target/polyglot-runner.jar # 9000
-cd backend && mvn test -Dtest=McpIntegrationTest -Dmcp.integration=true
-# or cli: cd spring-ai-cli-agent && mvn test -Dmcp.integration=true
+cd backend && mvn test -Dmcp.integration=true
+# or from top level: mvn test -Dmcp.integration=true -pl backend
 ```
 
 Unit tests mock `ObjectProvider<SyncMcpToolCallbackProvider>` (`AgentConfigurationTest.java:31`) so `mvn test` passes without MCP.

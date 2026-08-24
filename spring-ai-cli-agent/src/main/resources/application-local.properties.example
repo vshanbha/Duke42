@@ -1,0 +1,4 @@
+# Local override for Mac (MLX) – copy to application-local.properties and run with --spring.profiles.active=local
+# or use -Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx
+# This file is git-ignored (see .gitignore) – not committed, for local Mac only.
+spring.ai.ollama.chat.options.model=gemma4:e4b-mlx
