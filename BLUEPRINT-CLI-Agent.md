@@ -690,7 +690,7 @@ class AgentConfiguration {
 }
 ```
 
-> **Note:** Production code keeps QnA separate (`AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` → `qnaNormalized = new AskUserQuestionNormalizationCallback(ToolCallbacks.from(askTool)[0])` for flat `{"question","header","options"}` → `{"questions":[...]}` spec repair) + `domainCallbacks` (`Calculator`/`UnitConverter`) and wraps via `Stream.concat(Stream.of(qnaNormalized), Arrays.stream(domainCallbacks)).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks`; `UserVisibleToolCallback` is pure trace embellishment (`[Tool]`/`[Tool arguments]`/`[Tool result]`) – no `if (name.contains(...))` AoP branching.
+> **Note:** Production code keeps QnA separate (`AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` → `defaultTools(askTool)`) and domain tools via `ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool()).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks`; `UserVisibleToolCallback` is pure trace embellishment (`[Tool]`/`[Tool arguments]`/`[Tool result]`) – no `if (name.contains(...))` AoP branching, no normalization wrapper.
 
 ### `ChatLoop.java` (complete)
 

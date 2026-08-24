@@ -78,20 +78,6 @@
 | **Enterprise RAG** | granite4.1:8b | 5.3GB | IBM, Apache 2.0, RAG focus |
 | **Minimal Agent** | nemotron-3-nano:4b | 2.8GB | Fastest possible, tools+thinking |
 
-### Speed Comparison (Active Params)
-
-```
-Fastest ────────────────────────────────────────── Slowest
-
-lfm2.5          1B active   5.2GB   ████████████████ Fastest
-nemotron-3-nano 3.5B active 2.8GB   ███████████████  Very Fast
-qwen3.5:2b      2B active   2.7GB   ██████████████   Fast
-qwen3.5:4b      4B active   3.4GB   █████████████    Medium
-gemma4:e4b      4.5B active 9.6GB   ████████████     Medium
-qwen3.5:9b      9B active   6.6GB   ██████████       Medium
-lfm2.5-thinking 1.2B active 731MB   ████████████████ Fastest (tiny)
-```
-
 ---
 
 ## SPRING AI CONFIGURATION
