@@ -108,7 +108,11 @@ class ChatLoopTest {
         when(requestSpec.user(any(String.class))).thenReturn(requestSpec);
         when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
         when(requestSpec.stream()).thenReturn(streamSpec);
-        when(streamSpec.content()).thenReturn(Flux.just("AI", " response"));
+        org.springframework.ai.chat.model.ChatResponse r1 = new org.springframework.ai.chat.model.ChatResponse(
+            java.util.List.of(new org.springframework.ai.chat.model.Generation(new org.springframework.ai.chat.messages.AssistantMessage("AI"))));
+        org.springframework.ai.chat.model.ChatResponse r2 = new org.springframework.ai.chat.model.ChatResponse(
+            java.util.List.of(new org.springframework.ai.chat.model.Generation(new org.springframework.ai.chat.messages.AssistantMessage(" response"))));
+        when(streamSpec.chatResponse()).thenReturn(Flux.just(r1, r2));
 
         ChatLoop chatLoop = new ChatLoop(chatClient);
 
@@ -122,7 +126,7 @@ class ChatLoopTest {
             verify(chatClient).prompt();
             verify(requestSpec).user("Hello");
             verify(requestSpec).stream();
-            verify(streamSpec).content();
+            verify(streamSpec).chatResponse();
         } finally {
             System.setIn(originalIn);
         }

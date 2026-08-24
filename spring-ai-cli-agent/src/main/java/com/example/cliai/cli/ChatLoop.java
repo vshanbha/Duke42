@@ -28,6 +28,8 @@ class ChatLoop implements CommandLineRunner {
         System.out.println("╚══════════════════════════════════════╝\n");
 
         AtomicReference<String> sessionId = new AtomicReference<>(SESSION_ID_PREFIX + UUID.randomUUID());
+        SlashCommandHandler slashHandler = new SlashCommandHandler();
+        SlashCommand.Context slashContext = new SlashCommand.Context(sessionId);
         try (Scanner scanner = new Scanner(System.in)) {
             while (true) {
                 System.out.print("You: ");
@@ -36,34 +38,53 @@ class ChatLoop implements CommandLineRunner {
                     break;
                 }
                 String input = scanner.nextLine();
-                String command = input.trim().toLowerCase();
-                if ("exit".equals(command) || "quit".equals(command) || "/exit".equals(command)) {
-                    System.out.println("Goodbye!");
+                SlashCommand.Result slashResult = slashHandler.handle(input, slashContext);
+                if (slashResult == SlashCommand.Result.EXIT) {
                     break;
                 }
-                if ("/help".equals(command)) {
-                    printHelp();
-                    continue;
-                }
-                if ("/tools".equals(command)) {
-                    printTools();
-                    continue;
-                }
-                if ("/clear".equals(command)) {
-                    sessionId.set(SESSION_ID_PREFIX + UUID.randomUUID());
-                    System.out.println("Conversation cleared.\n");
+                if (slashResult == SlashCommand.Result.HANDLED) {
                     continue;
                 }
 
                 try {
-                    System.out.print("\nAI: ");
+                    System.out.print("\nThinking... ");
+                    System.out.flush();
+                    java.util.concurrent.atomic.AtomicBoolean firstContent = new java.util.concurrent.atomic.AtomicBoolean(true);
+                    java.util.concurrent.atomic.AtomicBoolean thinkingPrinted = new java.util.concurrent.atomic.AtomicBoolean(false);
                     chatClient.prompt()
                         .user(input)
                         .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId.get()))
                         .stream()
-                        .content()
-                        .doOnNext(System.out::print)
+                        .chatResponse()
+                        .doOnNext(cr -> {
+                            // Reasoning content via OllamaChatOptions thinking (see https://docs.spring.io/spring-ai/reference/api/chat/ollama-chat.html#_thinking_mode_reasoning)
+                            String thinking = null;
+                            try {
+                                thinking = (String) cr.getResult().getMetadata().get("thinking");
+                                if (thinking == null) thinking = (String) cr.getResult().getMetadata().get("reasoningContent");
+                            } catch (Exception ignored) {}
+                            if (thinking != null && !thinking.isBlank()) {
+                                if (thinkingPrinted.compareAndSet(false, true)) {
+                                    System.out.print("\r");
+                                }
+                                System.out.println("[Thinking] " + thinking);
+                                System.out.flush();
+                            }
+                            String content = null;
+                            try { content = cr.getResult().getOutput().getText(); } catch (Exception ignored) {}
+                            if (content != null && !content.isBlank()) {
+                                if (firstContent.getAndSet(false)) {
+                                    if (!thinkingPrinted.get()) System.out.print("\r");
+                                    System.out.print("AI: ");
+                                }
+                                System.out.print(content);
+                                System.out.flush();
+                            }
+                        })
                         .blockLast();
+                    if (firstContent.get() && !thinkingPrinted.get()) {
+                        System.out.print("\r");
+                    }
                     System.out.println("\n");
                 } catch (Exception e) {
                     System.out.println("\n[Error] " + e.getMessage() + "\n");
@@ -77,6 +98,7 @@ class ChatLoop implements CommandLineRunner {
         System.out.println("  /help   Show this help");
         System.out.println("  /tools  List available tools");
         System.out.println("  /clear  Start a fresh conversation");
+        System.out.println("  /think  Show thinking config/help");
         System.out.println("  /exit   Exit the CLI");
         System.out.println("  exit    Exit the CLI\n");
     }

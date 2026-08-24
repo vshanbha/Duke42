@@ -509,7 +509,7 @@ public class CalculatorTool {
 
 We use Spring Expression Language (SpEL) instead of `javax.script` because Java 17+ removed the Nashorn JavaScript engine.
 
-### 4.2 Register the Tool
+#### 4.2.2 Register the Tool
 
 ```java
 .defaultTools(
@@ -528,13 +528,33 @@ mvn spring-boot:run
 # AI should call the calculator tool and give you the answer
 ```
 
+### 4.4 Test Implementation
+
+* `src/test/java/com/example/cliai/agent/tools/CalculatorToolTest.java:12` – 12 tests (`shouldAddTwoNumbers`, `shouldHandleParentheses`, `shouldThrowOnInvalidExpression` etc., including `pi` via `context.setVariable("pi", Math.PI)`). Created in `Step 8.2` historically, now introduced here:
+
+```bash
+mvn test -Dtest=CalculatorToolTest
+# 12 tests, SpEL `2 + 3` → `5.0`, `(2+3)*4` → `20.0`, `1/0` → `IllegalArgumentException`
+```
+
+### 4.5 Further Reading
+
+* Spring AI `Tool Calling` – `@Tool(description="...")` as selection hint, `@ToolParam` per-param docs
+* Spring `SpEL` – `SpelExpressionParser`, `StandardEvaluationContext` vs removed `Nashorn`
+
 ---
 
 ## Step 5: Multiple Tools
 
 **Concept**: When multiple tools are registered, the AI picks the right one based on the user's request. It can even call multiple tools in sequence for complex questions.
 
-### 5.1 Create UnitConverterTool
+### 5.1 Dependencies
+
+No new dependencies – second tool discovered via same `ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool())` and `UserVisibleToolCallback` trace.
+
+### 5.2 Code Implementation
+
+#### 5.2.1 Create UnitConverterTool
 
 Create `src/main/java/com/example/cliai/agent/tools/UnitConverterTool.java`:
 
@@ -567,7 +587,7 @@ public class UnitConverterTool {
 }
 ```
 
-### 5.2 Register Both Tools
+#### 5.2.2 Register Both Tools
 
 ```java
 .defaultTools(
@@ -591,13 +611,33 @@ mvn spring-boot:run
 # AI calls both tools in sequence
 ```
 
+### 5.4 Test Implementation
+
+* `src/test/java/com/example/cliai/agent/tools/UnitConverterToolTest.java:12` – 12 tests (`shouldConvertKmToMiles` `100→62.1371`, `shouldConvertCelsiusToFahrenheit`, `shouldHandleCaseInsensitiveUnits` etc.):
+
+```bash
+mvn test -Dtest=UnitConverterToolTest
+# 12 tests, `convert(100,"km","miles")` → `62.1371 miles`, unsupported → `Unsupported conversion`
+```
+
+### 5.5 Further Reading
+
+* Spring AI `Tool Calling` – multiple `ToolCallbacks`, AI tool selection via `description`
+* `ToolCallingEvalTest.java:32` `calculatorPromptMustExecuteCalculatorTool` – `trace.contains("[Tool] calculate","[Tool result] 128.0")` with real `gemma4:e4b-mlx`
+
 ---
 
 ## Step 6: Logging Advisor
 
 **Concept**: Advisors wrap around every AI call. A logging advisor shows you what's being sent to the model and what comes back — invaluable for debugging.
 
-### 6.1 Update AgentConfiguration
+### 6.1 Dependencies
+
+No new dependencies – `SimpleLoggerAdvisor` is built into `spring-ai-client-chat:2.0.0` (already via `spring-ai-starter-model-ollama`).
+
+### 6.2 Code Implementation
+
+#### 6.2.1 Update AgentConfiguration
 
 ```java
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -610,13 +650,22 @@ import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 )
 ```
 
-### 6.2 Verify
+### 6.3 Verify
 
 ```bash
 mvn spring-boot:run
 # Type anything
-# You'll see the full prompt and response logged to console
+# You'll see the full prompt and response logged to console via SimpleLoggerAdvisor + UserVisibleToolCallback [Tool] trace
 ```
+
+### 6.4 Test Implementation
+
+No new unit test – verified visually via logs and existing `ChatClientIntegrationTest` (`shouldGetResponseFromOllama` now logs via `SimpleLoggerAdvisor`) and `UserVisibleToolCallbackTest` trace. For MCP-logs see Step 10.
+
+### 6.5 Further Reading
+
+* Spring AI `Advisors` – `SimpleLoggerAdvisor` as `ChatClient` advisor, `MessageChatMemoryAdvisor` composition
+* Spring AI `Observability` – `ChatModelObservationConvention` vs `SimpleLoggerAdvisor` for production
 
 ---
 
@@ -624,13 +673,19 @@ mvn spring-boot:run
 
 **Concept**: Spring Boot's Maven plugin packages your app as a self-contained executable jar. No servlet container needed — it runs as a CLI application.
 
-### 7.1 Build
+### 7.1 Dependencies
+
+No new dependencies – `spring-boot-maven-plugin:4.1.0` already in `pom.xml:59` `build.plugins`.
+
+### 7.2 Code Implementation
+
+#### 7.2.1 Build
 
 ```bash
 mvn clean package -DskipTests
 ```
 
-### 7.2 Run
+#### 7.2.2 Run
 
 ```bash
 java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
@@ -638,13 +693,24 @@ java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 
 The jar includes all dependencies and the Spring Boot loader. Anyone with Java 17+ can run it.
 
+### 7.3 Test Implementation
+
+No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`46 tests` with `gemma4:e4b-mlx`).
+
+### 7.4 Further Reading
+
+* Spring Boot `Maven Plugin` – `spring-boot:run` vs `java -jar`, `repackage` goal
+* GraalVM `native:compile` – `native-maven-plugin` for `spring-ai-cli-agent` (experimental, `polyglot` needs GraalPy)
+
 ---
 
-## Step 8: Unit Testing
+## Step 8: Full Test Suite (Tests Were Introduced Per Chapter)
 
-**Concept**: Write unit tests for your tools and components using JUnit 5, AssertJ, and Mockito. These tests run without Ollama — they test your code logic, not the LLM.
+**Concept**: Testing was introduced at `Step 3.4` (`spring-boot-starter-test`) and each chapter added its own tests (`CalculatorToolTest` in `4.4`, `UnitConverterToolTest` in `5.4`, `AgentConfigurationTest`/`UserVisibleToolCallbackTest`/`CommandLineQuestionHandlerTest` in `3.4`). This step aggregates them – no new concept, just verification.
 
-### 8.1 Add Test Dependency
+### 8.1 Dependencies
+
+Already added in `Step 3.4`: `spring-boot-starter-test` (JUnit 5 + AssertJ + Mockito). No new dependencies here.
 
 Add to `pom.xml`:
 
@@ -1060,20 +1126,26 @@ class ChatLoopTest {
 }
 ```
 
-### 8.5b UserVisibleToolCallbackTest, ChatClientIntegrationTest, ToolCallingEvalTest
+### 8.5b Additional Tests (see repo)
 
-Create these additional tests exactly as in the repo (see `src/test/java/com/example/cliai/agent/UserVisibleToolCallbackTest.java`, `ChatClientIntegrationTest.java`, `ToolCallingEvalTest.java`). They verify: trace/normalization (`wrapsSingleAskUserQuestionInQuestionsArray`), live Ollama `lfm2.5` memory (`shouldRememberContextAcrossTurns`), and tool-calling evals (`calculatorPromptMustExecuteCalculatorTool`, `clarificationPromptMustExecuteAskUserQuestionTool`, `sufficientlyAmbiguousPromptShouldTriggerClarificationTool` – run with `mvn test -Devals=true`).
+Create `UserVisibleToolCallbackTest.java` (pure trace `passesArgumentsThroughUnchanged`), `ChatClientIntegrationTest.java` (real `gemma4:e4b-mlx` memory `shouldRememberContextAcrossTurns`), `ToolCallingEvalTest.java` (opt-in `gemma4:e4b-mlx` `calculatorPromptMustExecuteCalculatorTool` / `clarificationPromptMustExecuteAskUserQuestionTool` – asserts `[Tool] AskUserQuestionTool` trace + `CommandLineQuestionHandler` `System.in` mock), and `CommandLineQuestionHandlerTest.java` (4 tests for handler spec as in `3.4`).
 
 ### 8.6 Run Tests
 
 ```bash
 mvn test
-# 42 tests: 39 unit/integration + 3 evals skipped (run with -Devals=true + Ollama lfm2.5 for evals)
+# 46 tests: 43 unit/integration + 3 evals skipped (run with -Devals=true + Ollama gemma4:e4b-mlx for evals)
 # e.g. mvn test -Devals=true -Dtest=ToolCallingEvalTest#clarificationPromptMustExecuteAskUserQuestionTool
 
 mvn test -pl backend
 # 10 tests (GraphQL + REST mocked, MCP skipped without -Dmcp.integration)
 ```
+
+### 8.7 Further Reading
+
+* JUnit 5 + AssertJ + Mockito – `mock(ChatModel.class)`, `ArgumentCaptor<Prompt>`, `verify(chatModel).call`
+* `ChatClientIntegrationTest` vs `ToolCallingEvalTest` – mocked vs real `gemma4:e4b-mlx` with `ChatMemory.CONVERSATION_ID`
+* `spring-boot-starter-test` – `test` scope, surefire `JUnitPlatformProvider`
 
 ---
 
@@ -1091,7 +1163,9 @@ spring-ai-cli-agent/
 │   │       ├── CalculatorTool.java
 │   │       └── UnitConverterTool.java
 │   └── cli/
-│       └── ChatLoop.java
+│       ├── ChatLoop.java
+│       ├── SlashCommand.java              # command pattern interface for /help, /tools, etc.
+│       └── SlashCommandHandler.java       # registry for all slash commands
 ├── src/main/resources/
 │   └── application.properties
 └── src/test/java/com/example/cliai/
@@ -1104,7 +1178,7 @@ spring-ai-cli-agent/
     │       └── UnitConverterToolTest.java
     └── cli/
         ├── ChatLoopTest.java
-        ├── ChatClientIntegrationTest.java   # needs Ollama lfm2.5
+        ├── ChatClientIntegrationTest.java   # needs Ollama gemma4:e4b-mlx (or lfm2.5)
         └── ToolCallingEvalTest.java         # -Devals=true, confirms handler was *used* via mocked System.in + trace
 ```
 
@@ -1191,6 +1265,8 @@ spring-ai-cli-agent/
 # Default was lfm2.5 (5.2 GB, fastest). Switched to gemma4:e4b-mlx (8.8 GB MLX, more reliable tool-calling) per manual CLI verification – see ../../ollama-model-links.md (model: gemma4:e4b)
 spring.ai.ollama.base-url=http://localhost:11434
 spring.ai.ollama.chat.options.model=gemma4:e4b-mlx
+# Thinking: enable model thinking for gemma4/lfm2.5 (tools+thinking). Values: true/false/low/medium/high
+# spring.ai.ollama.chat.think=medium
 # MCP client is disabled by default so unit tests run without external dependencies.
 spring.ai.mcp.client.enabled=false
 spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
@@ -1334,6 +1410,8 @@ class ChatLoop implements CommandLineRunner {
         System.out.println("╚══════════════════════════════════════╝\n");
 
         AtomicReference<String> sessionId = new AtomicReference<>(SESSION_ID_PREFIX + UUID.randomUUID());
+        SlashCommandHandler slashHandler = new SlashCommandHandler();
+        SlashCommand.Context slashContext = new SlashCommand.Context(sessionId);
         try (Scanner scanner = new Scanner(System.in)) {
             while (true) {
                 System.out.print("You: ");
@@ -1342,34 +1420,52 @@ class ChatLoop implements CommandLineRunner {
                     break;
                 }
                 String input = scanner.nextLine();
-                String command = input.trim().toLowerCase();
-                if ("exit".equals(command) || "quit".equals(command) || "/exit".equals(command)) {
-                    System.out.println("Goodbye!");
+                SlashCommand.Result slashResult = slashHandler.handle(input, slashContext);
+                if (slashResult == SlashCommand.Result.EXIT) {
                     break;
                 }
-                if ("/help".equals(command)) {
-                    printHelp();
-                    continue;
-                }
-                if ("/tools".equals(command)) {
-                    printTools();
-                    continue;
-                }
-                if ("/clear".equals(command)) {
-                    sessionId.set(SESSION_ID_PREFIX + UUID.randomUUID());
-                    System.out.println("Conversation cleared.\n");
+                if (slashResult == SlashCommand.Result.HANDLED) {
                     continue;
                 }
 
                 try {
-                    System.out.print("\nAI: ");
+                    System.out.print("\nThinking... ");
+                    System.out.flush();
+                    java.util.concurrent.atomic.AtomicBoolean firstContent = new java.util.concurrent.atomic.AtomicBoolean(true);
+                    java.util.concurrent.atomic.AtomicBoolean thinkingPrinted = new java.util.concurrent.atomic.AtomicBoolean(false);
                     chatClient.prompt()
                         .user(input)
                         .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId.get()))
                         .stream()
-                        .content()
-                        .doOnNext(System.out::print)
+                        .chatResponse()
+                        .doOnNext(cr -> {
+                            String thinking = null;
+                            try {
+                                thinking = (String) cr.getResult().getMetadata().get("thinking");
+                                if (thinking == null) thinking = (String) cr.getResult().getMetadata().get("reasoningContent");
+                            } catch (Exception ignored) {}
+                            if (thinking != null && !thinking.isBlank()) {
+                                if (thinkingPrinted.compareAndSet(false, true)) {
+                                    System.out.print("\r");
+                                }
+                                System.out.println("[Thinking] " + thinking);
+                                System.out.flush();
+                            }
+                            String content = null;
+                            try { content = cr.getResult().getOutput().getText(); } catch (Exception ignored) {}
+                            if (content != null && !content.isBlank()) {
+                                if (firstContent.getAndSet(false)) {
+                                    if (!thinkingPrinted.get()) System.out.print("\r");
+                                    System.out.print("AI: ");
+                                }
+                                System.out.print(content);
+                                System.out.flush();
+                            }
+                        })
                         .blockLast();
+                    if (firstContent.get() && !thinkingPrinted.get()) {
+                        System.out.print("\r");
+                    }
                     System.out.println("\n");
                 } catch (Exception e) {
                     System.out.println("\n[Error] " + e.getMessage() + "\n");
@@ -1377,24 +1473,12 @@ class ChatLoop implements CommandLineRunner {
             }
         }
     }
-
-    private void printHelp() {
-        System.out.println("\nCommands:");
-        System.out.println("  /help   Show this help");
-        System.out.println("  /tools  List available tools");
-        System.out.println("  /clear  Start a fresh conversation");
-        System.out.println("  /exit   Exit the CLI");
-        System.out.println("  exit    Exit the CLI\n");
-    }
-
-    private void printTools() {
-        System.out.println("\nAvailable tools:");
-        System.out.println("  CalculatorTool      Evaluate mathematical expressions");
-        System.out.println("  UnitConverterTool   Convert supported units");
-        System.out.println("  AskUserQuestionTool Let the agent ask a clarifying question\n");
-    }
 }
 ```
+
+> **Slash commands via command pattern:** All `/help`, `/tools`, `/clear`, `/think`, `/exit` (and aliases `exit`/`quit`) are handled in `SlashCommand.java` (`interface SlashCommand {name(), description(), supports(), execute()}`) and `SlashCommandHandler.java` (registry `List<SlashCommand>` + `handle()`). `ChatLoop` only delegates to `slashHandler.handle(input, slashContext)` – no `if-else` chain in `ChatLoop`. See `src/main/java/com/example/cliai/cli/SlashCommand*.java`.
+
+> **Thinking indicator:** `ChatLoop` shows `Thinking...` while waiting for first `chatResponse()` chunk and, if `spring.ai.ollama.chat.think=medium` (or `true`/`low`/`high`), prints `[Thinking] <content>` from `ChatResponse.getResult().getMetadata().get("thinking")` / `get("reasoningContent")` per [Ollama docs](https://docs.spring.io/spring-ai/reference/api/chat/ollama-chat.html#_thinking_mode_reasoning) and `#_reasoning_content_via_openai_compatibility`. Enable via `application.properties` and `/think` shows help.
 
 ---
 
@@ -1490,25 +1574,81 @@ mutation {
 
 Schema: [`backend/src/main/resources/graphql/schema.graphqls`](backend/src/main/resources/graphql/schema.graphqls)
 
-### Enable MCP (connect to polyglot)
+---
 
-1. Start the polyglot MCP server:
+## Step 10: MCP Client (Model Context Protocol) – Connect to Polyglot
+
+**Concept:** MCP is an open standard (like LSP for tools) – a client (our `spring-ai-cli-agent`/`backend`) discovers tools from an MCP server (`polyglot` on `9000`) via SSE. Unlike `AskUserQuestionTool` (agent-local QnA), MCP tools are remote, discovered at runtime, and require a `SyncMcpToolCallbackProvider`.
+
+**Dependencies:** Add to `spring-ai-cli-agent/pom.xml` (already in `Complete pom.xml` – deferred from Step 3 per separate-section rule):
+
+```xml
+<dependency>
+    <groupId>org.springframework.ai</groupId>
+    <artifactId>spring-ai-starter-mcp-client</artifactId>
+</dependency>
+```
+No `<version>` – managed by `spring-ai-bom:2.0.0`. `AskUserQuestionTool` (`agent-utils:0.10.0`) needs `<version>` because `org.springaicommunity` is not BOM-managed.
+
+**Code Implementation – Wiring in `AgentConfiguration.java`:**
+
+The final `AgentConfiguration.java` (see `## Complete AgentConfiguration.java`) already does:
+
+```java
+AskUserQuestionTool askUserQuestionTool = AskUserQuestionTool.builder()
+    .questionHandler(new CommandLineQuestionHandler())
+    .build();
+ToolCallback[] allWithTrace = ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool())
+    .map(UserVisibleToolCallback::new).toArray(ToolCallback[]::new);
+ChatClient.Builder builder = ChatClient.builder(chatModel)
+    .defaultSystem("You are an interactive CLI assistant...")
+    .defaultToolCallbacks(allWithTrace)
+    .defaultAdvisors(new SimpleLoggerAdvisor(), MessageChatMemoryAdvisor.builder(chatMemory).build());
+mcpProvider.ifAvailable(provider -> builder.defaultTools(provider)); // MCP tools added if server on 9000
+return builder.build();
+```
+`application.properties` (both `spring-ai-cli-agent` and `backend`):
+
+```properties
+spring.ai.mcp.client.enabled=false # true to use polyglot
+spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
+```
+
+**Test Implementation:**
+
+`backend/src/test/java/com/example/edge/McpIntegrationTest.java` – opt-in, needs `polyglot` running:
+
+```bash
+cd polyglot && mvn clean install && java -jar target/polyglot-runner.jar # 9000
+cd backend && mvn test -Dtest=McpIntegrationTest -Dmcp.integration=true
+# or cli: cd spring-ai-cli-agent && mvn test -Dmcp.integration=true
+```
+
+Unit tests mock `ObjectProvider<SyncMcpToolCallbackProvider>` (`AgentConfigurationTest.java:31`) so `mvn test` passes without MCP.
+
+**Verify (manual):**
+
+1. Start polyglot:
 ```bash
 cd polyglot
 mvn clean install
 java -jar target/polyglot-runner.jar
 ```
-
-2. Enable MCP in `backend/src/main/resources/application.properties`:
+2. Enable MCP in `src/main/resources/application.properties`:
 ```properties
 spring.ai.mcp.client.enabled=true
 ```
+3. Restart `spring-ai-cli-agent` or `backend` – logs show `McpClient` connecting, `ToolCallingEvalTest` can now call `sentiment` tool.
 
-3. Restart the backend. The AI can now call the sentiment analysis tool.
+**Further Reading:**
+
+* MCP Spec `modelcontextprotocol.io/specification/2025-03-26/client/elicitation` (elicitation vs `AskUserQuestionTool` local QnA)
+* Spring AI MCP `docs.spring.io/spring-ai/reference/api/mcp/mcp-overview.html` + `mcp-annotations-client` (`@McpElicitation`)
+* `AskUserQuestionTool.md` `Important: AskUserQuestionTool can be used only with main Agents not sub-agents`
 
 ---
 
-## Step 10: Streaming Responses
+## Step 11: Streaming Responses
 
 By default, ChatClient `.call()` waits for the full response. Streaming shows tokens as they arrive — better UX in both the CLI and Vaadin UI.
 
@@ -1557,6 +1697,50 @@ CompletableFuture.runAsync(() -> {
         .blockLast();
 });
 ```
+
+### Thinking Mode (Reasoning) – gemma4/lfm2.5 via `spring.ai.ollama.chat.think`
+
+**Concept:** Thinking-capable models (`gemma4:e4b-mlx`, `qwen3:*-thinking`, `deepseek-r1` per [Ollama docs](https://docs.spring.io/spring-ai/reference/api/chat/ollama-chat.html#_thinking_mode_reasoning)) can emit `thinking` before the final answer. Native Ollama uses `thinking` metadata (`OllamaChatModel:THINKING_METADATA_KEY="thinking"`), OpenAI-compatibility uses `reasoningContent` (`#_reasoning_content_via_openai_compatibility`).
+
+**Dependencies:** No new dependency – `spring-ai-starter-model-ollama:2.0.0` already includes `OllamaChatOptions` `ThinkOption` (`ThinkBoolean`/`ThinkLevel`) and `OllamaChatProperties` `think` (`TRUE/FALSE/LOW/MEDIUM/HIGH`).
+
+**Code – `application.properties`:**
+
+```properties
+spring.ai.ollama.chat.think=medium  # or true/false/low/medium/high – see OllamaChatProperties:think / OllamaChatOptions.enableThinking()
+# alternative: spring.ai.ollama.chat.options.think=medium
+```
+
+**Code – `ChatLoop.java` indicator + reasoning via `chatResponse()` (`ChatResponse.getResult().getMetadata().get("thinking")` or `"reasoningContent"`):**
+
+```java
+System.out.print("\nThinking... "); // indicator while waiting for first token
+AtomicBoolean firstContent = new AtomicBoolean(true), thinkingPrinted = new AtomicBoolean(false);
+chatClient.prompt().user(input).advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId.get()))
+    .stream().chatResponse().doOnNext(cr -> {
+        String thinking = (String) cr.getResult().getMetadata().get("thinking");
+        if (thinking == null) thinking = (String) cr.getResult().getMetadata().get("reasoningContent");
+        if (thinking != null && !thinking.isBlank()) {
+            if (thinkingPrinted.compareAndSet(false, true)) System.out.print("\r");
+            System.out.println("[Thinking] " + thinking);
+        }
+        String content = cr.getResult().getOutput().getText();
+        if (content != null && !content.isBlank()) {
+            if (firstContent.getAndSet(false) && !thinkingPrinted.get()) System.out.print("\r");
+            System.out.print(content); // streaming content
+        }
+    }).blockLast();
+System.out.println();
+```
+
+`/think` in CLI prints help and property docs.
+
+**Test Implementation:** `CommandLineQuestionHandlerTest` still `4` unit tests; `ToolCallingEvalTest` with `gemma4:e4b-mlx` `think=medium` still asserts `[Tool] AskUserQuestionTool` trace – thinking does not break tool calling. Manual: `mvn spring-boot:run` → `You: Explain quantum entanglement` → `[Thinking] ...` then `AI: ...`.
+
+**Further Reading:**
+
+* Ollama `Thinking Mode` – `enableThinking()/disableThinking()/thinkLow()/thinkMedium()/thinkHigh()` and `response.getResult().getMetadata().get("thinking")` (`stream().chatResponse()` variant)
+* Ollama `Reasoning Content via OpenAI Compatibility` – `reasoningContent` via `OpenAiChatModel` with `baseUrl=http://localhost:11434/v1` for same Ollama models
 
 ### Why Streaming Matters
 
