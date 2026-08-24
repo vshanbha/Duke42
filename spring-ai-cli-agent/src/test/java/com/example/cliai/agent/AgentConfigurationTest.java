@@ -73,10 +73,13 @@ class AgentConfigurationTest {
 
         assertThat(promptText).contains("You are an interactive CLI assistant");
         assertThat(promptText).contains("Be helpful, concise");
+        assertThat(promptText).contains("use an available tool to ask");
+        assertThat(promptText).contains("never ask in ordinary assistant text");
         // System prompt must NOT mention tool-specific details — those belong in the tool description.
         assertThat(promptText).doesNotContain("AskUserQuestionTool");
         assertThat(promptText).doesNotContain("questions array");
         assertThat(promptText).doesNotContain("The tool input must be a JSON object");
+        assertThat(promptText).doesNotContain("\"questions\"");
     }
 
     @Test
@@ -116,8 +119,11 @@ class AgentConfigurationTest {
         assertThat(content).contains("tool-oblivious");
         assertThat(content).contains("UserVisibleToolCallback");
         assertThat(content).contains("MUST use this tool for every question");
-        // System prompt example must be generic and tool-oblivious.
+        assertThat(content).contains("UserVisibleToolCallback – trace, description enrichment, and normalization");
+        // System prompt example must be generic but directive and tool-oblivious.
         assertThat(content).contains("You are an interactive CLI assistant.");
         assertThat(content).contains("Be helpful, concise");
+        assertThat(content).contains("use an available tool to ask");
+        assertThat(content).contains("never ask in ordinary assistant text");
     }
 }

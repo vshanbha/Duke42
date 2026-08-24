@@ -38,7 +38,7 @@ class AgentConfiguration {
         ChatClient.Builder builder = ChatClient.builder(chatModel)
             .defaultSystem("""
                 You are an interactive CLI assistant.
-                Be helpful, concise, and use the tools available to you when appropriate.
+                Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
                 """)
             .defaultToolCallbacks(visibleTools)
             .defaultAdvisors(

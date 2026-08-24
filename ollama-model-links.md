@@ -96,52 +96,34 @@ lfm2.5-thinking 1.2B active 731MB   ██████████████�
 
 ## SPRING AI CONFIGURATION
 
+> Config file is `src/main/resources/application.properties` (project moved from `application.yaml`/`application.yml` to `.properties`).
+
 ### Text-Only Edge Agent (lfm2.5)
 
-```yaml
-spring:
-  ai:
-    ollama:
-      base-url: http://localhost:11434
-      chat:
-        options:
-          model: lfm2.5
+```properties
+spring.ai.ollama.base-url=http://localhost:11434
+spring.ai.ollama.chat.options.model=lfm2.5
 ```
 
 ### Vision-Capable Edge Agent (qwen3.5:4b)
 
-```yaml
-spring:
-  ai:
-    ollama:
-      base-url: http://localhost:11434
-      chat:
-        options:
-          model: qwen3.5:4b
+```properties
+spring.ai.ollama.base-url=http://localhost:11434
+spring.ai.ollama.chat.options.model=qwen3.5:4b
 ```
 
 ### Minimal Memory Agent (nemotron-3-nano:4b)
 
-```yaml
-spring:
-  ai:
-    ollama:
-      base-url: http://localhost:11434
-      chat:
-        options:
-          model: nemotron-3-nano:4b
+```properties
+spring.ai.ollama.base-url=http://localhost:11434
+spring.ai.ollama.chat.options.model=nemotron-3-nano:4b
 ```
 
 ### Multimodal Agent (gemma4:e4b)
 
-```yaml
-spring:
-  ai:
-    ollama:
-      base-url: http://localhost:11434
-      chat:
-        options:
-          model: gemma4:e4b
+```properties
+spring.ai.ollama.base-url=http://localhost:11434
+spring.ai.ollama.chat.options.model=gemma4:e4b
 ```
 
 ---
