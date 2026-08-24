@@ -13,10 +13,11 @@ Chat with a local LLM (Ollama) from your terminal. The agent has:
 ## Quick Start
 
 ```bash
-# Prerequisites: Java 17+, Maven, Ollama with lfm2.5
-ollama pull lfm2.5
+# Prerequisites: Java 17+, Maven, Ollama with gemma4:e4b (Linux/CI) or gemma4:e4b-mlx (Mac MLX, already downloaded)
+ollama pull gemma4:e4b # or gemma4:e4b-mlx on Mac
+# Native Ollama thinking: spring.ai.ollama.chat.think=medium in application.properties
 
-# Run
+# Run (uses gemma4:e4b; Mac MLX: --spring.profiles.active=local or -Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx)
 mvn spring-boot:run
 
 # Chat
@@ -41,45 +42,54 @@ spring-ai-cli-agent/
 │   ├── Application.java              # Entry point
 │   ├── agent/
 │   │   ├── AgentConfiguration.java   # ChatClient + tools + memory
+│   │   ├── UserVisibleToolCallback.java # pure trace embellishment
 │   │   └── tools/
 │   │       ├── CalculatorTool.java    # Math evaluator (SpEL)
 │   │       └── UnitConverterTool.java # Unit conversions
 │   └── cli/
-│       └── ChatLoop.java             # Terminal REPL
+│       ├── ChatLoop.java             # Terminal REPL
+│       ├── SlashCommand.java         # command pattern interface
+│       └── SlashCommandHandler.java  # registry for /help, /tools, /clear, /think, /exit
 ├── src/main/resources/
-│   └── application.properties         # Ollama config
-└── src/test/java/                    # 31 tests
+│   ├── application.properties         # Ollama config (checked-in: gemma4:e4b)
+│   └── application-local.properties.example # local Mac MLX override (not committed)
+└── src/test/java/                    # 46 tests (43 unit/integration + 3 evals skipped)
 ```
 
 ## Run Tests
 
+From top level (`Duke42/`):
+
 ```bash
-mvn test
-# Unit, integration, and CLI behavior tests
-
-# Opt-in model/tool-call evaluation; requires Ollama with lfm2.5 running
-mvn test -Devals=true -Dtest=ToolCallingEvalTest
-
-# Run only the AskUserQuestionTool eval
-mvn test -Devals=true -Dtest=ToolCallingEvalTest#clarificationPromptMustExecuteAskUserQuestionTool
-
-# Run the ambiguity eval without naming the tool in the prompt
-mvn test -Devals=true -Dtest=ToolCallingEvalTest#sufficientlyAmbiguousPromptShouldTriggerClarificationTool
+mvn test # all modules (spring-ai-cli-agent 46 + backend 10)
+mvn test -pl spring-ai-cli-agent -am # only CLI agent
 ```
 
-The evaluations exit with code `0` when the model invokes the expected tool and
-returns a result. They exit nonzero when Ollama is unavailable or the tool call
-does not occur. They check the tool trace, not the model's factual wording.
+From `spring-ai-cli-agent/`:
+
+```bash
+mvn test # 46 tests, 3 evals skipped without Ollama
+mvn test -Devals=true # opt-in model/tool-call evals, requires Ollama gemma4:e4b (or gemma4:e4b-mlx via -Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx or --spring.profiles.active=local)
+```
+
+All tests pass with general setup – no need to specify `-Dtest=...`. Evals exit `0` when model invokes expected tool (checked via `[Tool]` trace), non-zero when Ollama unavailable.
 
 ## Configuration
 
-Edit `src/main/resources/application.properties`:
+Edit `src/main/resources/application.properties` (checked-in: `gemma4:e4b`, Linux/CI-friendly):
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=lfm2.5  # default (5.2 GB); alternatives: qwen3.5:9b (6.6 GB), gemma4:e4b (9.6 GB)
+spring.ai.ollama.chat.options.model=gemma4:e4b  # Linux/CI: gemma4:e4b (9.6 GB); Mac MLX: gemma4:e4b-mlx (8.8 GB) via application-local.properties
 # Full <10 GB tools-capable comparison: see ../ollama-model-links.md (single source of truth)
 ```
+
+Local Mac override – copy `application-local.properties.example` to `application-local.properties` (git-ignored) and run with `--spring.profiles.active=local`:
+
+```properties
+spring.ai.ollama.chat.options.model=gemma4:e4b-mlx
+```
+Or one-off: `mvn spring-boot:run -Dspring-boot.run.arguments=--spring.ai.ollama.chat.options.model=gemma4:e4b-mlx`
 
 ## How It Works
 

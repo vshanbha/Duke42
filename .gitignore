@@ -38,6 +38,8 @@ nb-configuration.xml
 
 # Local environment
 .env
+# Local Spring Boot overrides (e.g., application-local.properties with gemma4:e4b-mlx for Mac)
+**/application-local.properties
 
 # Plugin directory
 /.quarkus/cli/plugins/

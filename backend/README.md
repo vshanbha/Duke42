@@ -14,8 +14,8 @@ Spring Boot enterprise demo: Vaadin web UI, REST API, GraphQL, and optional MCP 
 ## Quick Start
 
 ```bash
-# Prerequisites: Java 17+, Maven, Ollama with lfm2.5
-ollama pull lfm2.5
+# Prerequisites: Java 17+, Maven, Ollama with gemma4:e4b (or gemma4:e4b-mlx on Mac)
+ollama pull gemma4:e4b # Mac MLX: gemma4:e4b-mlx, or -Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx
 
 cd backend
 mvn spring-boot:run
@@ -57,16 +57,18 @@ query {
 
 ## Tests
 
+From top level (`Duke42/`) or `backend/`:
+
 ```bash
 # Everything: unit + GraphQL tests, package, then E2E via failsafe
 # (E2E requires Ollama running; runs after packaging against the real jar)
-mvn clean verify
+mvn clean verify # or mvn verify -pl backend -am from top level
 
 # Unit + GraphQL tests only (no Ollama required)
-mvn test
+mvn test # top-level or mvn test -pl backend -am
 
-# MCP integration (requires polyglot on port 9000)
-mvn test -Dtest=McpIntegrationTest -Dmcp.integration=true
+# MCP integration (requires polyglot on port 9000) – no -Dtest needed, general setup
+mvn test -Dmcp.integration=true # or mvn test -pl backend -Dmcp.integration=true
 ```
 
 ## Docker
