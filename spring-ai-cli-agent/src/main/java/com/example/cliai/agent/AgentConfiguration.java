@@ -26,21 +26,16 @@ class AgentConfiguration {
             .maxMessages(20)
             .build();
 
-        // QnA tool is a first-class citizen per https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool
-        // and https://github.com/spring-ai-community/spring-ai-agent-utils/blob/main/spring-ai-agent-utils/docs/AskUserQuestionTool.md
+        // QnA implemented separately per https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool
+        // and AskUserQuestionTool.md – tool implementation passed as .questionHandler(...) to builder (no ToolCallbacks wrapping hack)
         // Spec: https://code.claude.com/docs/en/agent-sdk/user-input#question-format (questions[]:{question,header,options{label,description},multiSelect})
-        // Implemented separately with its own QuestionHandler – not bundled via AoP if-else.
         AskUserQuestionTool askUserQuestionTool = AskUserQuestionTool.builder()
             .questionHandler(new CommandLineQuestionHandler())
             .build();
 
-        ToolCallback qnaNormalized = new AskUserQuestionNormalizationCallback(
-            ToolCallbacks.from(askUserQuestionTool)[0]);
-        ToolCallback[] domainCallbacks = ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool());
-
-        ToolCallback[] visibleTools = java.util.stream.Stream.concat(
-                java.util.stream.Stream.of(qnaNormalized),
-                java.util.Arrays.stream(domainCallbacks))
+        // Domain tools embellished with pure trace – QnA stays separate, no AoP branching or normalization wrapper
+        ToolCallback[] domainWithTrace = java.util.Arrays.stream(
+                ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool()))
             .map(UserVisibleToolCallback::new)
             .toArray(ToolCallback[]::new);
 
@@ -49,7 +44,8 @@ class AgentConfiguration {
                 You are an interactive CLI assistant.
                 Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
                 """)
-            .defaultToolCallbacks(visibleTools)
+            .defaultTools(askUserQuestionTool)
+            .defaultToolCallbacks(domainWithTrace)
             .defaultAdvisors(
                 new SimpleLoggerAdvisor(),
                 MessageChatMemoryAdvisor.builder(chatMemory).build()
