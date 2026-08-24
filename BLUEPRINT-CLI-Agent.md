@@ -290,9 +290,9 @@ external data or user input. The AI *decides* when to call them. You don't invok
 
 `AskUserQuestionTool` lets the AI ask clarifying questions mid-conversation. Without guidance the model will clarify in plain text and `CommandLineQuestionHandler` never fires.
 
-> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. The model must be told to route every user-directed question through `AskUserQuestionTool`. That policy belongs in the **tool description**, not the system prompt. The system prompt stays tool-oblivious; `UserVisibleToolCallback` enriches `AskUserQuestionTool`'s description with the strict "MUST use for every question…" rule and the exact JSON shape (`{"questions":[{question,header,options:[{label,description}],multiSelect}]}`) that the handler expects. This keeps concerns separated: system prompt defines *who the assistant is*, the tool defines *when/how to call it*.
+> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. LLMs clarify in plain text unless nudged. That nudge belongs in the **system prompt generically** (`use an available tool to ask - never ask in ordinary assistant text`) without naming `AskUserQuestionTool`, while the tool's own `@Tool` description + `inputSchema` per [Claude spec](https://code.claude.com/docs/en/agent-sdk/user-input#question-format) and [AskUserQuestionTool.md](https://github.com/spring-ai-community/spring-ai-agent-utils/blob/main/spring-ai-agent-utils/docs/AskUserQuestionTool.md) already documents `questions[]:{question,header≤12,options[2-4]{label,description},multiSelect}`. QnA stays a separate first-class tool per [blog](https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool) (`AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()`).
 
-**What you'll add**: AskUserQuestionTool with a tool-description-embedded clarification policy so every user-directed question is structured.
+**What you'll add**: AskUserQuestionTool as separate QnA first-class tool with `CommandLineQuestionHandler` + tool-oblivious but directive system prompt.
 
 **New dependency** in `pom.xml`:
 
@@ -334,7 +334,7 @@ class AgentConfiguration {
 }
 ```
 
-> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors` and stays tool-oblivious but directive (`use an available tool to ask - never ask...`). Real production code wraps via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` for visible `[Tool]` trace, description enrichment (`MUST use for every question…` + JSON `{"questions":[...]}` schema/example), and `{"options":...}` → `{"questions":[...]}` normalization – see `UserVisibleToolCallback.java` (3.3 in TUTORIAL).
+> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors` and stays tool-oblivious but directive. Real production code keeps QnA separate (`qnaCallbacks` from `AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` vs `domainCallbacks` from `Calculator`/`UnitConverter`) and wraps both via `Stream.concat(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` for pure visible `[Tool]` trace – see `UserVisibleToolCallback.java` (3.3 in TUTORIAL, now pure embellishment per docs/spec).
 
 **New imports**:
 
@@ -690,7 +690,7 @@ class AgentConfiguration {
 }
 ```
 
-> **Note:** Production code wraps tools via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` and `UserVisibleToolCallback` enriches `AskUserQuestionTool`'s description with `MUST use for every question…` + JSON `{"questions":[...]}` schema/example, prints `[Tool]` trace and normalizes `{"options":...}` → `{"questions":[...]}`; system prompt stays tool-oblivious but directive (`use an available tool to ask - never ask...`).
+> **Note:** Production code keeps QnA separate (`AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` → `qnaNormalized = new AskUserQuestionNormalizationCallback(ToolCallbacks.from(askTool)[0])` for flat `{"question","header","options"}` → `{"questions":[...]}` spec repair) + `domainCallbacks` (`Calculator`/`UnitConverter`) and wraps via `Stream.concat(Stream.of(qnaNormalized), Arrays.stream(domainCallbacks)).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks`; `UserVisibleToolCallback` is pure trace embellishment (`[Tool]`/`[Tool arguments]`/`[Tool result]`) – no `if (name.contains(...))` AoP branching.
 
 ### `ChatLoop.java` (complete)
 
@@ -779,7 +779,7 @@ java -jar spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 |---|---|
 | `Connection refused` on Ollama | `ollama serve` must be running |
 | Tool calling doesn't work | Use a model with `tools` support — `lfm2.5` (default, 5.2 GB), `qwen3.5:9b` (6.6 GB) or `gemma4:e4b` (9.6 GB). See [`ollama-model-links.md`](ollama-model-links.md) for the full $<10$ GB comparison |
-| Model asks in plain text, never triggers `AskUserQuestionTool` | Tool description missing the "MUST use for every question… Never ask…" policy — ensure `UserVisibleToolCallback` enrichment is active (see STEP 3) |
+| Model asks in plain text, never triggers `AskUserQuestionTool` | QnA not separate / system prompt missing nudge – ensure `AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` separately (STEP 3, `qnaCallbacks` vs `domainCallbacks`) and `defaultSystem` has `use an available tool to ask - never ask...` (tool-oblivious, per Claude spec) |
 | Slow first response | Ollama loads the model into RAM on first call; subsequent calls are fast |
 | `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` or `qwen3.5:4b` (3.4 GB) |
 | Build fails on native image | Skip native for now, use `java -jar` |

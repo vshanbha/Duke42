@@ -301,7 +301,7 @@ mvn spring-boot:run
 
 `AskUserQuestionTool` lets the AI ask clarifying questions mid-conversation. For example, if you say "Help me learn Spring AI," the AI might ask "What's your experience level?" before giving advice.
 
-> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. LLMs are pre-trained to clarify in plain text. Without an explicit tool-usage policy the model will often skip the tool and emit `What's your experience?` as assistant text — so `CommandLineQuestionHandler` never fires. That policy belongs in the **tool description** (where the model decides *when* to call a tool), not in the system prompt. The system prompt stays tool-oblivious; `UserVisibleToolCallback` enriches `AskUserQuestionTool`'s description with the strict "use this tool for every user-directed question" rule and the exact JSON shape (`{"questions":[{question,header,options:[{label,description}],multiSelect}]}`) that `CommandLineQuestionHandler` expects. This keeps concerns separated: the system prompt defines *who the assistant is*, the tool defines *when and how to call it*.
+> **Why registration alone is not enough:** Exposing a tool makes it *available*, not *preferred*. LLMs are pre-trained to clarify in plain text. Without an explicit nudge the model will often skip the tool and emit `What's your experience?` as assistant text — so `CommandLineQuestionHandler` never fires. That nudge belongs in the **system prompt generically** (`use an available tool to ask - never ask in ordinary assistant text`) without naming `AskUserQuestionTool`, while the tool's own `@Tool` description + `inputSchema` per [Claude spec](https://code.claude.com/docs/en/agent-sdk/user-input#question-format) and [AskUserQuestionTool.md](https://github.com/spring-ai-community/spring-ai-agent-utils/blob/main/spring-ai-agent-utils/docs/AskUserQuestionTool.md) already documents `questions[]:{question,header≤12,options[2-4]{label,description},multiSelect}` and `answers:{question:label}`. This keeps concerns separated: system prompt nudges *how to ask*, tool defines *what to ask*, and QnA stays a separate first-class tool per [Spring blog](https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool) (`AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()`).
 
 ### 3.1 Add Dependencies
 
@@ -321,7 +321,7 @@ Add to `pom.xml` (`spring-ai-agent-utils` for `AskUserQuestionTool`; `spring-ai-
 
 ### 3.2 Update AgentConfiguration
 
-Keep the system prompt **tool-oblivious** but still nudging – it says *use an available tool to ask, never ask in ordinary text* without naming `AskUserQuestionTool`. Tool-specific `MUST` + JSON schema lives in the tool description, not in `defaultSystem`:
+Keep the system prompt **tool-oblivious** but directive – it says *use an available tool to ask, never ask in ordinary text* without naming `AskUserQuestionTool` or its `{"questions":...}` schema (per tool's own `inputSchema` + Claude spec). QnA is a first-class tool per [blog](https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool) and [docs](https://github.com/spring-ai-community/spring-ai-agent-utils/blob/main/spring-ai-agent-utils/docs/AskUserQuestionTool.md) – implemented separately with `CommandLineQuestionHandler`:
 
 ```java
 package com.example.cliai.agent;
@@ -363,20 +363,26 @@ class AgentConfiguration {
 }
 ```
 
-> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors`. This simplified `defaultTools` version is enough to follow the tutorial. The production code in `AgentConfiguration.java` does the same but via `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` → `defaultToolCallbacks` – see 3.3.
+> **Note:** `defaultSystem` must come before `defaultTools`/`defaultAdvisors`. This simplified `defaultTools(AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build())` is exactly how `AskUserQuestionTool.md: Console-Based Implementation` and the blog's `ask-user-question-demo` wire QnA – see 3.3 for the production embellishment.
 
-### 3.3 UserVisibleToolCallback – trace, description enrichment, and normalization (production)
+### 3.3 QnA implemented separately + pure trace embellishment (production)
 
-The tutorial `defaultTools` works, but the checked-in `AgentConfiguration.java` wraps every tool with `UserVisibleToolCallback`:
+The tutorial `defaultTools` works, but the checked-in `AgentConfiguration.java` keeps QnA as a separate first-class tool per [blog](https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool) and [AskUserQuestionTool.md](https://github.com/spring-ai-community/spring-ai-agent-utils/blob/main/spring-ai-agent-utils/docs/AskUserQuestionTool.md) + Claude spec [`questions[]:{question,header≤12,options[2-4]{label,description},multiSelect}`](https://code.claude.com/docs/en/agent-sdk/user-input#question-format) – not bundled via AoP `if (name.contains(...))`. Two dedicated decorators:
 
 ```java
-Object askUserQuestionTool = AskUserQuestionTool.builder()
+// QnA implemented separately – not ToolCallbacks.from(askTool, calc, converter) with AoP branching
+AskUserQuestionTool askUserQuestionTool = AskUserQuestionTool.builder()
     .questionHandler(new CommandLineQuestionHandler())
     .build();
 
-ToolCallback[] visibleTools = java.util.Arrays.stream(
-        ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
-    .map(UserVisibleToolCallback::new)
+ToolCallback qnaNormalized = new AskUserQuestionNormalizationCallback(
+    ToolCallbacks.from(askUserQuestionTool)[0]); // QnA-specific repair only
+ToolCallback[] domainCallbacks = ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool());
+
+ToolCallback[] visibleTools = java.util.stream.Stream.concat(
+        java.util.stream.Stream.of(qnaNormalized),
+        java.util.Arrays.stream(domainCallbacks))
+    .map(UserVisibleToolCallback::new) // pure trace for all, no definition mutation
     .toArray(ToolCallback[]::new);
 
 return ChatClient.builder(chatModel)
@@ -389,40 +395,72 @@ return ChatClient.builder(chatModel)
     .build();
 ```
 
-Create `src/main/java/com/example/cliai/agent/UserVisibleToolCallback.java`:
+Create `src/main/java/com/example/cliai/agent/UserVisibleToolCallback.java` (pure embellishment – no `if-else`, no `ObjectMapper`):
 
 ```java
+package com.example.cliai.agent;
+
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.ai.tool.metadata.ToolMetadata;
+
+/** Adds a concise, user-visible trace around a tool invocation – pure embellishment, no definition mutation. */
 final class UserVisibleToolCallback implements ToolCallback {
     private final ToolCallback delegate;
-    private final ObjectMapper objectMapper = new ObjectMapper();
     UserVisibleToolCallback(ToolCallback delegate) { this.delegate = delegate; }
-
-    @Override public ToolDefinition getToolDefinition() {
-        ToolDefinition original = delegate.getToolDefinition();
-        if (!original.name().toLowerCase().contains("askuserquestion")) return original;
-        String enriched = original.description()
-            + "\n\nYou MUST use this tool for every question directed at the user. "
-            + "Never ask the user a question in ordinary assistant text. "
-            + "If you need information, a preference, confirmation, or disambiguation, "
-            + "stop and call this tool first. After receiving the tool result, continue with the response."
-            + "\n\nThe tool input must be a JSON object with a \"questions\" array. "
-            + "Each question must contain \"question\", \"header\", \"options\", and \"multiSelect\". "
-            + "The \"questions\" field must always be an array, never a string. "
-            + "Each option must contain \"label\" and \"description\". "
-            + "Example: {\"questions\":[{\"question\":\"Which option do you prefer?\",\"header\":\"Preference\",\"options\":[{\"label\":\"Option A\",\"description\":\"First choice\"},{\"label\":\"Option B\",\"description\":\"Second choice\"}],\"multiSelect\":false}]}";
-        return ToolDefinition.builder().name(original.name()).description(enriched).inputSchema(original.inputSchema()).build();
+    @Override public ToolDefinition getToolDefinition() { return delegate.getToolDefinition(); }
+    @Override public ToolMetadata getToolMetadata() { return delegate.getToolMetadata(); }
+    @Override public String call(String arguments) { return invoke(arguments, () -> delegate.call(arguments)); }
+    @Override public String call(String arguments, ToolContext context) { return invoke(arguments, () -> delegate.call(arguments, context)); }
+    private String invoke(String arguments, java.util.function.Supplier<String> invocation) {
+        System.out.println("\n[Tool] " + getToolDefinition().name());
+        System.out.println("[Tool arguments] " + arguments);
+        try { String result = invocation.get(); System.out.println("[Tool result] " + result); return result; }
+        catch (RuntimeException e) { System.out.println("[Tool error] " + e.getMessage()); throw e; }
     }
-    @Override public String call(String arguments) { return invoke(arguments, () -> delegate.call(normalizeArguments(arguments))); }
-    // normalizeArguments(): wraps flat {"header","options",...} into {"questions":[...]} and fills missing question text
-    // invoke(): prints [Tool] / [Tool arguments] / [Tool result] trace – verified by ToolCallingEvalTest
 }
 ```
 
-**Three jobs:**
+Create `src/main/java/com/example/cliai/agent/AskUserQuestionNormalizationCallback.java` (QnA-specific – repairs `lfm2.5` flat `{"question","header","options"}` → `{"questions":[...]}` per spec, applied only to QnA callback):
 
-1. **Visible trace** – `invoke()` prints `[Tool] AskUserQuestionTool` / `[Tool arguments]` / `[Tool result]` – `ToolCallingEvalTest` asserts on this trace with a real `lfm2.5` model.
-2. **Description enrichment** – `getToolDefinition()` keeps the system prompt tool-oblivious but still forces the policy. Without it the stock `AskUserQuestionTool` description (`Tool:AskUserQuestionTool:205` `Use this tool when you need to ask...`) is too weak and `sufficientlyAmbiguousPromptShouldTriggerClarificationTool` flaps.
-3. **Schema normalization** – `normalizeArguments()` repairs the common `{"options":...}` flat payload into the `{"questions":[...]}` shape `CommandLineQuestionHandler` expects.
+```java
+package com.example.cliai.agent;
+
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.ai.tool.metadata.ToolMetadata;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
+
+/** QnA-specific payload normalizer – not a generic AoP `if-else`. */
+final class AskUserQuestionNormalizationCallback implements ToolCallback {
+    private final ToolCallback delegate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    AskUserQuestionNormalizationCallback(ToolCallback delegate) { this.delegate = delegate; }
+    @Override public ToolDefinition getToolDefinition() { return delegate.getToolDefinition(); }
+    @Override public ToolMetadata getToolMetadata() { return delegate.getToolMetadata(); }
+    @Override public String call(String arguments) { return delegate.call(normalize(arguments)); }
+    @Override public String call(String arguments, ToolContext context) { return delegate.call(normalize(arguments), context); }
+    private String normalize(String arguments) {
+        try {
+            JsonNode root = objectMapper.readTree(arguments);
+            if (root.isObject() && root.has("options") && !root.has("questions")) {
+                ObjectNode q = (ObjectNode) root.deepCopy();
+                if (!q.has("question")) q.put("question", q.path("header").asText("Please choose an option") + ". Please choose an option.");
+                ObjectNode w = objectMapper.createObjectNode(); w.putArray("questions").add(q);
+                return objectMapper.writeValueAsString(w);
+            }
+        } catch (Exception ignored) {}
+        return arguments;
+    }
+}
+```
+
+**Jobs:** `AskUserQuestionNormalizationCallback` – QnA-specific spec repair (flat → `questions[]`) without generic `if (name.contains)`; `UserVisibleToolCallback` – generic visible trace (`[Tool]`/`[Tool arguments]`/`[Tool result]`) for all tools, verified by `ToolCallingEvalTest` with `lfm2.5`. Stock `AskUserQuestionTool` description + `inputSchema` already follows Claude spec; validation (`InvalidUserAnswerException`) stays in tool per `AskUserQuestionTool.md: Error Handling`.
 
 ### 3.4 Verify
 
@@ -806,7 +844,7 @@ class UnitConverterToolTest {
 
 ### 8.4 AgentConfigurationTest
 
-Create `src/test/java/com/example/cliai/agent/AgentConfigurationTest.java` (verifies tool-oblivious system prompt and enriched tool description – matches checked-in test):
+Create `src/test/java/com/example/cliai/agent/AgentConfigurationTest.java` (verifies tool-oblivious system prompt and pure embellisher – matches checked-in test):
 
 ```java
 package com.example.cliai.agent;
@@ -885,25 +923,22 @@ class AgentConfigurationTest {
     }
 
     @Test
-    void askUserQuestionToolDescriptionShouldContainUsagePolicyAndSchema() {
+    void askUserQuestionToolDescriptionShouldBePreservedByEmbellisher() {
         ToolCallback delegate = ToolCallbacks.from(
             org.springaicommunity.agent.tools.AskUserQuestionTool.builder()
                 .questionHandler(questions -> java.util.Map.of())
                 .build()
         )[0];
         ToolCallback wrapped = new UserVisibleToolCallback(delegate);
-        String description = wrapped.getToolDefinition().description();
-        assertThat(description).contains("You MUST use this tool for every question");
-        assertThat(description).contains("Never ask the user a question in ordinary assistant text");
-        assertThat(description).contains("questions");
-        assertThat(description).contains("header");
-        assertThat(description).contains("multiSelect");
-        assertThat(description).contains("label");
-        assertThat(description).contains("{\"questions\"");
+        assertThat(wrapped.getToolDefinition().description()).isEqualTo(delegate.getToolDefinition().description());
+        assertThat(wrapped.getToolDefinition().name()).isEqualTo(delegate.getToolDefinition().name());
+        assertThat(wrapped.getToolDefinition().inputSchema()).isEqualTo(delegate.getToolDefinition().inputSchema());
+        assertThat(wrapped.getToolDefinition().description()).contains("Use this tool when you need to ask the user questions");
+        assertThat(wrapped.getToolDefinition().inputSchema()).contains("questions");
     }
 
     @Test
-    void tutorialStep3MustDocumentToolDescriptionPolicy() throws Exception {
+    void tutorialStep3MustDocumentSeparateQnAImplementation() throws Exception {
         Path tutorial = Path.of("").toAbsolutePath().resolve("TUTORIAL.md");
         if (!Files.exists(tutorial)) tutorial = Path.of("../TUTORIAL.md").toAbsolutePath().normalize();
         if (!Files.exists(tutorial)) tutorial = Path.of("../../TUTORIAL.md").toAbsolutePath().normalize();
@@ -912,8 +947,9 @@ class AgentConfigurationTest {
         assertThat(content).contains("Why registration alone is not enough");
         assertThat(content).contains("tool-oblivious");
         assertThat(content).contains("UserVisibleToolCallback");
-        assertThat(content).contains("MUST use this tool for every question");
-        assertThat(content).contains("UserVisibleToolCallback – trace, description enrichment, and normalization");
+        assertThat(content).contains("AskUserQuestionTool.builder()");
+        assertThat(content).contains("CommandLineQuestionHandler");
+        assertThat(content).contains("code.claude.com/docs/en/agent-sdk/user-input#question-format");
         assertThat(content).contains("You are an interactive CLI assistant.");
         assertThat(content).contains("Be helpful, concise");
         assertThat(content).contains("use an available tool to ask");
@@ -1053,7 +1089,7 @@ spring-ai-cli-agent/
 │   ├── Application.java
 │   ├── agent/
 │   │   ├── AgentConfiguration.java
-│   │   ├── UserVisibleToolCallback.java  # trace + tool-description enrichment + normalization
+│   │   ├── UserVisibleToolCallback.java  # pure trace embellishment
 │   │   └── tools/
 │   │       ├── CalculatorTool.java
 │   │       └── UnitConverterTool.java
@@ -1062,10 +1098,11 @@ spring-ai-cli-agent/
 ├── src/main/resources/
 │   └── application.properties
 └── src/test/java/com/example/cliai/
-    ├── agent/
-    │   ├── AgentConfigurationTest.java
-    │   ├── UserVisibleToolCallbackTest.java
-    │   └── tools/
+├── agent/
+│   ├── AgentConfiguration.java
+│   ├── UserVisibleToolCallback.java  # pure trace embellishment
+│   ├── AskUserQuestionNormalizationCallback.java  # QnA-specific flat→questions repair
+│   └── tools/
     │       ├── CalculatorToolTest.java
     │       └── UnitConverterToolTest.java
     └── cli/
@@ -1139,12 +1176,19 @@ class AgentConfiguration {
             .maxMessages(20)
             .build();
 
-        Object askUserQuestionTool = AskUserQuestionTool.builder()
+        // QnA implemented separately per https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool
+        // and AskUserQuestionTool.md – QnA-specific normalization isolated from generic trace embellishment
+        AskUserQuestionTool askUserQuestionTool = AskUserQuestionTool.builder()
             .questionHandler(new CommandLineQuestionHandler())
             .build();
 
-        ToolCallback[] visibleTools = java.util.Arrays.stream(
-                ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
+        ToolCallback qnaNormalized = new AskUserQuestionNormalizationCallback(
+            ToolCallbacks.from(askUserQuestionTool)[0]);
+        ToolCallback[] domainCallbacks = ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool());
+
+        ToolCallback[] visibleTools = java.util.stream.Stream.concat(
+                java.util.stream.Stream.of(qnaNormalized),
+                java.util.Arrays.stream(domainCallbacks))
             .map(UserVisibleToolCallback::new)
             .toArray(ToolCallback[]::new);
 
@@ -1166,11 +1210,47 @@ class AgentConfiguration {
 }
 ```
 
-Production `UserVisibleToolCallback.java` (see 3.3) enriches `AskUserQuestionTool` description with the `MUST/Never` policy + `{"questions":[...]}` schema/example and prints `[Tool]` trace; system prompt stays generic but directive.
+QnA is a separate first-class tool (`AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` per blog/docs, spec `questions[]:{question,header,options{label,description},multiSelect}`); `AskUserQuestionNormalizationCallback` repairs `lfm2.5` flat `{"question","header","options"}` → `{"questions":[...]}` (QnA-specific), `UserVisibleToolCallback` is pure trace embellishment (no `if-else`).
 
 ## Complete UserVisibleToolCallback.java
 
 > Exactly `src/main/java/com/example/cliai/agent/UserVisibleToolCallback.java` – create this file in Step 3.3 to make the tutorial line-by-line complete:
+
+```java
+package com.example.cliai.agent;
+
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.ai.tool.metadata.ToolMetadata;
+
+/** Adds a concise, user-visible trace around a tool invocation – pure embellishment, no definition mutation. */
+final class UserVisibleToolCallback implements ToolCallback {
+
+    private final ToolCallback delegate;
+    UserVisibleToolCallback(ToolCallback delegate) { this.delegate = delegate; }
+    @Override public ToolDefinition getToolDefinition() { return delegate.getToolDefinition(); }
+    @Override public ToolMetadata getToolMetadata() { return delegate.getToolMetadata(); }
+    @Override public String call(String arguments) { return invoke(arguments, () -> delegate.call(arguments)); }
+    @Override public String call(String arguments, ToolContext context) { return invoke(arguments, () -> delegate.call(arguments, context)); }
+    private String invoke(String arguments, java.util.function.Supplier<String> invocation) {
+        System.out.println("\n[Tool] " + getToolDefinition().name());
+        System.out.println("[Tool arguments] " + arguments);
+        try {
+            String result = invocation.get();
+            System.out.println("[Tool result] " + result);
+            return result;
+        } catch (RuntimeException exception) {
+            System.out.println("[Tool error] " + exception.getMessage());
+            throw exception;
+        }
+    }
+}
+```
+
+### Complete AskUserQuestionNormalizationCallback.java
+
+> QnA-specific repair per Claude spec [`questions[]:{question,header,options{label,description},multiSelect}`](https://code.claude.com/docs/en/agent-sdk/user-input#question-format) – applied only to the QnA callback, not via generic `if-else`:
 
 ```java
 package com.example.cliai.agent;
@@ -1184,75 +1264,26 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Adds a concise, user-visible trace around a tool invocation. */
-final class UserVisibleToolCallback implements ToolCallback {
-
+/** QnA-specific payload normalizer – not a generic AoP `if-else`. */
+final class AskUserQuestionNormalizationCallback implements ToolCallback {
     private final ToolCallback delegate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    UserVisibleToolCallback(ToolCallback delegate) {
-        this.delegate = delegate;
-    }
-
-    @Override
-    public ToolDefinition getToolDefinition() {
-        ToolDefinition original = delegate.getToolDefinition();
-        if (!original.name().toLowerCase().contains("askuserquestion")) {
-            return original;
-        }
-        String enriched = original.description()
-            + "\n\nYou MUST use this tool for every question directed at the user. "
-            + "Never ask the user a question in ordinary assistant text. "
-            + "If you need information, a preference, confirmation, or disambiguation, "
-            + "stop and call this tool first. After receiving the tool result, continue with the response."
-            + "\n\nThe tool input must be a JSON object with a \"questions\" array. "
-            + "Each question must contain \"question\", \"header\", \"options\", and \"multiSelect\". "
-            + "The \"questions\" field must always be an array, never a string. "
-            + "Each option must contain \"label\" and \"description\". "
-            + "Example: {\"questions\":[{\"question\":\"Which option do you prefer?\",\"header\":\"Preference\","
-            + "\"options\":[{\"label\":\"Option A\",\"description\":\"First choice\"},"
-            + "{\"label\":\"Option B\",\"description\":\"Second choice\"}],\"multiSelect\":false}]}";
-        return ToolDefinition.builder()
-            .name(original.name())
-            .description(enriched)
-            .inputSchema(original.inputSchema())
-            .build();
-    }
-
+    AskUserQuestionNormalizationCallback(ToolCallback delegate) { this.delegate = delegate; }
+    @Override public ToolDefinition getToolDefinition() { return delegate.getToolDefinition(); }
     @Override public ToolMetadata getToolMetadata() { return delegate.getToolMetadata(); }
-    @Override public String call(String arguments) { return invoke(arguments, () -> delegate.call(normalizeArguments(arguments))); }
-    @Override public String call(String arguments, ToolContext context) { return invoke(arguments, () -> delegate.call(normalizeArguments(arguments), context)); }
-
-    private String normalizeArguments(String arguments) {
-        if (!getToolDefinition().name().toLowerCase().contains("askuserquestion")) return arguments;
+    @Override public String call(String arguments) { return delegate.call(normalize(arguments)); }
+    @Override public String call(String arguments, ToolContext context) { return delegate.call(normalize(arguments), context); }
+    private String normalize(String arguments) {
         try {
             JsonNode root = objectMapper.readTree(arguments);
             if (root.isObject() && root.has("options") && !root.has("questions")) {
-                ObjectNode question = (ObjectNode) root.deepCopy();
-                if (!question.has("question")) {
-                    String header = question.path("header").asText("Please choose an option");
-                    question.put("question", header + ". Please choose an option.");
-                }
-                ObjectNode wrapped = objectMapper.createObjectNode();
-                ArrayNode questions = wrapped.putArray("questions");
-                questions.add(question);
-                return objectMapper.writeValueAsString(wrapped);
+                ObjectNode q = (ObjectNode) root.deepCopy();
+                if (!q.has("question")) q.put("question", q.path("header").asText("Please choose an option") + ". Please choose an option.");
+                ObjectNode w = objectMapper.createObjectNode(); w.putArray("questions").add(q);
+                return objectMapper.writeValueAsString(w);
             }
         } catch (Exception ignored) {}
         return arguments;
-    }
-
-    private String invoke(String arguments, java.util.function.Supplier<String> invocation) {
-        System.out.println("\n[Tool] " + getToolDefinition().name());
-        System.out.println("[Tool arguments] " + arguments);
-        try {
-            String result = invocation.get();
-            System.out.println("[Tool result] " + result);
-            return result;
-        } catch (RuntimeException exception) {
-            System.out.println("[Tool error] " + exception.getMessage());
-            throw exception;
-        }
     }
 }
 ```
@@ -1368,7 +1399,7 @@ class ChatLoop implements CommandLineRunner {
 |-------|-----|
 | `Connection refused` on Ollama | Run `ollama serve` first |
 | Tool calling doesn't work | Use a model with `tools` support — `lfm2.5` (default, 5.2 GB), `qwen3.5:9b` (6.6 GB) or `gemma4:e4b` (9.6 GB). See [`ollama-model-links.md`](ollama-model-links.md) for the full $<10$ GB comparison |
-| Model asks clarifying question in plain text, never triggers `AskUserQuestionTool` | Tool registered but no description policy — ensure `AskUserQuestionTool`'s description requires "MUST use for every question… Never ask in ordinary text" (production code does this via `UserVisibleToolCallback`; tutorial `defaultTools` relies on the same enriched description when using the real code path) |
+| Model asks clarifying question in plain text, never triggers `AskUserQuestionTool` | QnA not registered as separate first-class tool per blog/docs – ensure `AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` is registered (tutorial 3.2, production `qnaCallbacks`/`domainCallbacks` in 3.3) and `defaultSystem` contains `use an available tool to ask - never ask in ordinary assistant text` (tool-oblivious nudge) |
 | Slow first response | Ollama loads the model into RAM on first call; subsequent calls are fast |
 | `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` or `qwen3.5:4b` (3.4 GB) |
 | `javax.script` errors | We use SpEL instead — Java 17+ removed Nashorn |

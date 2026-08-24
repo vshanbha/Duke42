@@ -83,27 +83,25 @@ class AgentConfigurationTest {
     }
 
     @Test
-    void askUserQuestionToolDescriptionShouldContainUsagePolicyAndSchema() {
-        // The policy previously lived in defaultSystem; now it must live in the tool description.
+    void askUserQuestionToolDescriptionShouldBePreservedByEmbellisher() {
+        // UserVisibleToolCallback is pure embellishment (trace) per docs – must not mutate definition.
         ToolCallback delegate = ToolCallbacks.from(
             org.springaicommunity.agent.tools.AskUserQuestionTool.builder()
                 .questionHandler(questions -> java.util.Map.of())
                 .build()
         )[0];
         ToolCallback wrapped = new UserVisibleToolCallback(delegate);
-        String description = wrapped.getToolDefinition().description();
-
-        assertThat(description).contains("You MUST use this tool for every question");
-        assertThat(description).contains("Never ask the user a question in ordinary assistant text");
-        assertThat(description).contains("questions");
-        assertThat(description).contains("header");
-        assertThat(description).contains("multiSelect");
-        assertThat(description).contains("label");
-        assertThat(description).contains("{\"questions\"");
+        // No AoP branching – description and schema are preserved exactly (see AskUserQuestionTool.md and Claude spec https://code.claude.com/docs/en/agent-sdk/user-input#question-format)
+        assertThat(wrapped.getToolDefinition().description()).isEqualTo(delegate.getToolDefinition().description());
+        assertThat(wrapped.getToolDefinition().name()).isEqualTo(delegate.getToolDefinition().name());
+        assertThat(wrapped.getToolDefinition().inputSchema()).isEqualTo(delegate.getToolDefinition().inputSchema());
+        assertThat(wrapped.getToolDefinition().description()).contains("Use this tool when you need to ask the user questions");
+        // Stock description already documents questions[]:{question,header,options{label,description},multiSelect}
+        assertThat(wrapped.getToolDefinition().inputSchema()).contains("questions");
     }
 
     @Test
-    void tutorialStep3MustDocumentToolDescriptionPolicy() throws Exception {
+    void tutorialStep3MustDocumentSeparateQnAImplementation() throws Exception {
         Path tutorial = Path.of("").toAbsolutePath().resolve("TUTORIAL.md");
         if (!Files.exists(tutorial)) {
             tutorial = Path.of("../TUTORIAL.md").toAbsolutePath().normalize();
@@ -115,11 +113,12 @@ class AgentConfigurationTest {
 
         String content = Files.readString(tutorial);
         assertThat(content).contains("Why registration alone is not enough");
-        // Tutorial must explain that the policy belongs in the tool description, not the system prompt.
+        // Tutorial must document QnA as separate first-class tool per https://spring.io/blog/2026/01/16/spring-ai-ask-user-question-tool and AskUserQuestionTool.md
         assertThat(content).contains("tool-oblivious");
         assertThat(content).contains("UserVisibleToolCallback");
-        assertThat(content).contains("MUST use this tool for every question");
-        assertThat(content).contains("UserVisibleToolCallback – trace, description enrichment, and normalization");
+        assertThat(content).contains("AskUserQuestionTool.builder()");
+        assertThat(content).contains("CommandLineQuestionHandler");
+        assertThat(content).contains("code.claude.com/docs/en/agent-sdk/user-input#question-format");
         // System prompt example must be generic but directive and tool-oblivious.
         assertThat(content).contains("You are an interactive CLI assistant.");
         assertThat(content).contains("Be helpful, concise");

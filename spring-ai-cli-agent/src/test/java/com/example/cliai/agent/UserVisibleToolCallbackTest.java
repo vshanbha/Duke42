@@ -3,7 +3,7 @@ package com.example.cliai.agent;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.ai.tool.metadata.ToolMetadata;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -12,36 +12,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 class UserVisibleToolCallbackTest {
 
     @Test
-    void wrapsSingleAskUserQuestionInQuestionsArray() throws Exception {
+    void passesArgumentsThroughUnchangedForAskUserQuestionTool() {
         AtomicReference<String> received = new AtomicReference<>();
         ToolCallback delegate = new StubToolCallback("AskUserQuestionTool", received);
         UserVisibleToolCallback callback = new UserVisibleToolCallback(delegate);
 
-        String result = callback.call("""
-            {"question":"What kind of project?","header":"Project type","options":[],"multiSelect":false}
-            """);
+        String payload = """
+            {"questions":[{"question":"What kind of project?","header":"Project type","options":[{"label":"A","description":"desc"}],"multiSelect":false}]}
+            """;
+        callback.call(payload);
 
-        assertThat(result).isEqualTo("ok");
-        assertThat(new ObjectMapper().readTree(received.get()).path("questions").isArray()).isTrue();
-        assertThat(received.get()).contains("What kind of project?");
+        assertThat(received.get()).isEqualTo(payload);
     }
 
     @Test
-    void suppliesQuestionTextWhenModelSendsOnlyHeaderAndOptions() throws Exception {
-        AtomicReference<String> received = new AtomicReference<>();
-        ToolCallback delegate = new StubToolCallback("AskUserQuestionTool", received);
-        UserVisibleToolCallback callback = new UserVisibleToolCallback(delegate);
-
-        callback.call("""
-            {"header":"Project type","options":[],"multiSelect":false}
-            """);
-
-        var question = new ObjectMapper().readTree(received.get()).path("questions").get(0);
-        assertThat(question.path("question").asText()).isEqualTo("Project type. Please choose an option.");
-    }
-
-    @Test
-    void leavesNonAskUserToolArgumentsUnchanged() {
+    void passesArgumentsThroughUnchangedForCalculatorTool() {
         AtomicReference<String> received = new AtomicReference<>();
         ToolCallback delegate = new StubToolCallback("CalculatorTool", received);
         UserVisibleToolCallback callback = new UserVisibleToolCallback(delegate);
@@ -49,6 +34,17 @@ class UserVisibleToolCallbackTest {
         callback.call("{\"expression\":\"2 + 2\"}");
 
         assertThat(received.get()).isEqualTo("{\"expression\":\"2 + 2\"}");
+    }
+
+    @Test
+    void preservesToolDefinition() {
+        AtomicReference<String> received = new AtomicReference<>();
+        ToolCallback delegate = new StubToolCallback("AskUserQuestionTool", received);
+        UserVisibleToolCallback callback = new UserVisibleToolCallback(delegate);
+
+        assertThat(callback.getToolDefinition().name()).isEqualTo("AskUserQuestionTool");
+        assertThat(callback.getToolDefinition().description()).isEqualTo("test");
+        assertThat(callback.getToolDefinition().inputSchema()).isEqualTo("{}");
     }
 
     private static final class StubToolCallback implements ToolCallback {
@@ -67,6 +63,11 @@ class UserVisibleToolCallbackTest {
         @Override
         public ToolDefinition getToolDefinition() {
             return definition;
+        }
+
+        @Override
+        public ToolMetadata getToolMetadata() {
+            return ToolMetadata.builder().build();
         }
 
         @Override
