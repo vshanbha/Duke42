@@ -25,13 +25,14 @@ github_owner: "@vshanbha"
 opencode_username: "duke42-founder"
 
 # ── Models ───────────────────────────────────────────────────────────
-# Which provider seeded the tiers below. Blank tiers mean "inherit": sync writes
-# nothing and each harness keeps its own model. See docs/MODELS.md.
+# Tiers routed through the opencode zen catalog (Decision #3).
+# Swap procedure: edit these keys -> `make sync-harnesses` -> land via PR
+# (generated adapters are drift-checked). Catalog: https://opencode.ai/zen/go/v1/models
 cost_profile: "standard"
-model_provider: "inherit"
-opencode_frontier_model: ""
-opencode_default_model: ""
-opencode_economy_model: ""
+model_provider: "opencode"
+opencode_frontier_model: "opencode-go/muse-spark-1.2-contributor"
+opencode_default_model: "opencode-go/ox-alpha-free"
+opencode_economy_model: "opencode-go/ox-alpha-free"
 claude_frontier_model: ""
 claude_default_model: ""
 claude_economy_model: ""
