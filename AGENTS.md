@@ -139,6 +139,32 @@ Use the `/worklog` command to generate the entry.
 - **Implementer**: Makes failing tests pass; cannot edit test files
 - **Reviewer**: Adversarial, different model than implementer; output is findings for human
 
+> These roles are now enforced, not aspirational: the softwareaifactory.sh gates
+> (below) block test edits by implementer/refactorer sessions via
+> `scripts/hooks/test-edit-denial.sh`. In ordinary (non-role) sessions the agent
+> writes tests and implementation together per "After Major Feature Changes".
+
+## Software Factory (softwareaifactory.sh — installed 2026-08-26)
+
+Enforcement hooks from [softwareaifactory.sh](https://softwareaifactory.sh)
+(template `anoop2811/software-factory-template` @ v0.1.5) are installed and
+proven. Full rulebook: [`docs/FACTORY_RULES.md`](docs/FACTORY_RULES.md);
+decisions: [`docs/DECISION_LOG.md`](docs/DECISION_LOG.md).
+
+- **Gates** (`scripts/hooks/*.sh`): commit-message lint (no unverified "verified" claims),
+  test-edit denial, decision-log gate on protected paths (`scripts/hooks`, `.github/workflows`),
+  direct-push block, drift checks. Configured in flat [`factory.yaml`](factory.yaml).
+- **Roles**: `.opencode/agent/{spec-writer,implementer,refactorer,reviewer,wiki-maintainer}.md`
+  — opencode is canon; `.claude/` + `.codex/` adapters are generated (`make sync-harnesses`).
+- **Proofs**: every gate ships a break→FAIL→revert→PASS fixture — `make selftest`
+  (141 checks). CI runs it in the `factory-gates` job.
+- **Check command** (Maven override, Decision #2):
+  `mvn -q test '-Dtest=!ChatClientIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false && ./scripts/hooks/junit5-only-check.sh`
+- **Push gate**: `git config core.hooksPath .githooks` (one-time per clone).
+- **Doctor / report**: `./factory doctor`, `./factory report`.
+- Java pack is upstream-"experimental": Spotless/Error Prone/SpotBugs/PIT are NOT
+  wired into these Maven poms yet (Decision #2).
+
 ### Gate-Based Verification
 
 - Every check must be seen to fail before passing: `break → FAIL → revert → PASS`
