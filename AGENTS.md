@@ -161,6 +161,31 @@ decisions: [`docs/DECISION_LOG.md`](docs/DECISION_LOG.md).
 - **Check command** (Maven override, Decision #2):
   `mvn -q test '-Dtest=!ChatClientIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false && ./scripts/hooks/junit5-only-check.sh`
 - **Push gate**: `git config core.hooksPath .githooks` (one-time per clone).
+
+### PR Workflow (how every change lands)
+
+Direct pushes to `main` are DENIED by `.githooks/pre-push` (`direct-main-push-block`).
+There is NO bypass env var; `--no-verify` defeats local gates but is a governance
+violation — don't. Branch protection is intentionally OFF (Decision #5: solo
+maintainer); the local gate is the enforcement.
+
+1. `git checkout -b <type>/<short-desc>` — never stage work on `main`
+2. Commit message must pass `commit-message-lint.sh`: conventional type,
+   ≤6 body bullets of ≤25 words, any "verified"/"fixed"/"works" claim cites the
+   exact command AND its output (or write "written but NOT verified")
+3. Commit touches `factory.yaml`, `opencode.json`, `scripts/hooks`, or
+   `.github/workflows`? It must reference a `docs/DECISION_LOG.md` number
+4. Push branch → `gh pr create`
+5. Both CI jobs must pass before merge:
+   - `Factory gate proofs` (~30s break/fix selftest)
+   - `test` (~8min full suite)
+6. For substantive code changes: run the adversarial subagent on the diff first —
+   `@reviewer` (muse-spark tier, edit-denied) per `workflows/review-diamond.md`;
+   post findings to the PR, address or rebut each one
+7. `gh pr merge N --merge --delete-branch`; sync back: `git checkout main && git pull`
+
+Quick reference — current state is always checkable via `gh pr list --state open`,
+`./factory doctor` (gate health), `./factory report` (what gates caught).
 - **Doctor / report**: `./factory doctor`, `./factory report`.
 - **Model tiers** (Decision #3): frontier = `opencode-go/muse-spark-1.2-contributor`
   (spec-writer, reviewer); default & economy = `opencode-go/ox-alpha-free`
