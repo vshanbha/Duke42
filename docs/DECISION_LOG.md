@@ -68,3 +68,13 @@ Consequence: `.opencode/agent/spec-writer.md` now differs from upstream v0.1.5.
 `./factory upgrade` may report or overwrite it — if so, re-apply this Decision's
 wording rather than silently reverting to Ginkgo. Filed as an upstream note via
 the java-pack discussion (#66) since other Maven/Java adopters hit the same leak.
+
+## #5 — Branch protection intentionally OFF; local direct-push gate is the enforcement (2026-08-26)
+
+Duke42 has a single committer. GitHub-side branch protection on `main` is
+therefore deliberately not enabled: the `.githooks/pre-push`
+`direct-main-push-block` gate is the enforcement, and the maintainer accepts
+that `git push --no-verify` from a configured clone bypasses it locally.
+
+Consequence for agents: do NOT re-suggest enabling branch protection while this
+decision stands. If the contributor count grows, revisit.
