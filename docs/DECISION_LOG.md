@@ -28,3 +28,28 @@ Maven build with no wrapper. Decisions:
 - `java-pack.yml` workflow deleted until Spotless/Error Prone/SpotBugs/PIT are
   wired as Maven plugins in the poms — shipping a red-on-arrival CI workflow is
   worse than deferring it. Revisit when pom quality plugins land.
+
+## #3 — Factory model tiers via the opencode zen catalog (2026-08-26)
+
+Reviewer/spec-writer must run on a different model than the implementer
+(AGENTS.md Role-Based Development; reviewer.md's own header). With
+`model_provider: inherit` every tier stayed blank, so all roles would have run
+this repo's default model — violating that rule.
+
+Decision: pin both zen-catalog models, one per tier:
+
+- `opencode_frontier_model: opencode-go/muse-spark-1.2-contributor`
+  → spec-writer, reviewer (frontier tier)
+- `opencode_default_model: opencode-go/ox-alpha-free`
+  → implementer, harness default; also `opencode_economy_model`
+  → refactorer, wiki-maintainer (collapses to default under standard profile)
+
+Both IDs verified present in https://opencode.ai/zen/go/v1/models on
+2026-08-26. Choice is deliberately cheap to change at runtime:
+
+1. edit the three `opencode_*_model` keys in `factory.yaml`
+2. `make sync-harnesses`
+3. land via PR (generated adapters are drift-checked)
+
+No other file needs touching. `claude_*`/`codex_*` tiers stay blank on purpose:
+those harnesses are unused here and blank means "keep their own defaults".
