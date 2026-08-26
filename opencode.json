@@ -36,7 +36,7 @@
   },
   "agent": {
     "spec-writer": {
-      "description": "Writes Ginkgo acceptance specs from the formal spec. Use for story-loop red phase. Frontier model.",
+      "description": "Writes JUnit 5 + AssertJ acceptance tests from the formal spec. Use for story-loop red phase. Frontier model.",
       "mode": "subagent",
       "permission": {
         "edit": "ask",
