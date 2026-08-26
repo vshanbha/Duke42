@@ -19,7 +19,10 @@ final class SlashCommandHandler {
             new HelpCommand(),
             new ToolsCommand(),
             new ClearCommand(),
-            new ThinkCommand()
+            new ThinkCommand(),
+            new RoleCommand(),
+            new ModelCommand(),
+            new TempCommand()
         );
     }
 
@@ -61,12 +64,17 @@ final class SlashCommandHandler {
         @Override public Result execute(String input, Context context) {
             System.out.println("\nCommands:");
             // Registry will be injected for full list – fallback to static help if called directly
-            System.out.println("  /help   Show this help");
-            System.out.println("  /tools  List available tools");
-            System.out.println("  /clear  Start a fresh conversation");
-            System.out.println("  /think  Show thinking config/help");
-            System.out.println("  /exit   Exit the CLI");
-            System.out.println("  exit    Exit the CLI\n");
+            System.out.println("  /help    Show this help");
+            System.out.println("  /tools   List available tools");
+            System.out.println("  /clear   Start a fresh conversation");
+            System.out.println("  /think   Show thinking config/help");
+            System.out.println("  /role    Show/set the assistant role (PromptTemplate {role})");
+            System.out.println("  /model   Show/switch chat model via ChatOptions");
+            System.out.println("  /temp    Show/set sampling temperature (ChatOptions)");
+            System.out.println("  /image   <path> <question> - ask about an image (multimodality)");
+            System.out.println("  /convert <value> <from> <to> - structured output conversion");
+            System.out.println("  /exit    Exit the CLI");
+            System.out.println("  exit     Exit the CLI\n");
             return Result.HANDLED;
         }
     }
@@ -107,6 +115,91 @@ final class SlashCommandHandler {
             System.out.println("Docs: https://docs.spring.io/spring-ai/reference/api/chat/ollama-chat.html#_thinking_mode_reasoning");
             System.out.println(" Docs reasoning_content via OpenAI compatibility: ...#_reasoning_content_via_openai_compatibility");
             System.out.println("Manual indicator: CLI shows 'Thinking...' while waiting; thinking content from metadata \"thinking\"/\"reasoningContent\" is shown as [Thinking] if available.\n");
+            return Result.HANDLED;
+        }
+    }
+
+    /** BLUEPRINT Step 2: per-request role via PromptTemplate {role} placeholder. */
+    static final class RoleCommand implements SlashCommand {
+        @Override public String name() { return "/role"; }
+        @Override public String description() { return "Show/set the assistant role"; }
+        @Override public boolean supports(String input) {
+            String c = input.trim().toLowerCase();
+            return c.equals("/role") || c.startsWith("/role ");
+        }
+        @Override public Result execute(String input, Context context) {
+            String arg = input.length() > "/role".length() ? input.substring("/role".length()).trim() : "";
+            if (arg.isEmpty()) {
+                String current = context.role().get();
+                System.out.println("Role: " + (current == null ? com.example.cliai.agent.SystemPrompts.DEFAULT_ROLE + " (default)" : current));
+                System.out.println("Set with: /role math tutor   (rendered into the {role} PromptTemplate placeholder)");
+                return Result.HANDLED;
+            }
+            context.role().set(arg);
+            System.out.println("Role set to: " + arg + "\n");
+            return Result.HANDLED;
+        }
+    }
+
+    /** BLUEPRINT Step 9: switch models per-call via ChatOptions. */
+    static final class ModelCommand implements SlashCommand {
+        @Override public String name() { return "/model"; }
+        @Override public String description() { return "Show/switch chat model"; }
+        @Override public boolean supports(String input) {
+            String c = input.trim().toLowerCase();
+            return c.equals("/model") || c.startsWith("/model ");
+        }
+        @Override public Result execute(String input, Context context) {
+            String arg = input.length() > "/model".length() ? input.substring("/model".length()).trim() : "";
+            if (arg.isEmpty()) {
+                String override = context.modelOverride().get();
+                System.out.println("Model: " + (override == null ? "(configured default)" : override));
+                System.out.println("Switch with: /model lfm2.5   (per-call OllamaChatOptions model override)");
+                return Result.HANDLED;
+            }
+            if ("reset".equalsIgnoreCase(arg)) {
+                context.modelOverride().set(null);
+                System.out.println("Model override cleared – using configured default.\n");
+                return Result.HANDLED;
+            }
+            context.modelOverride().set(arg);
+            System.out.println("Model override set to: " + arg + " (/model reset to clear)\n");
+            return Result.HANDLED;
+        }
+    }
+
+    /** BLUEPRINT Steps 2/9: sampling temperature via per-call ChatOptions. */
+    static final class TempCommand implements SlashCommand {
+        @Override public String name() { return "/temp"; }
+        @Override public String description() { return "Show/set sampling temperature"; }
+        @Override public boolean supports(String input) {
+            String c = input.trim().toLowerCase();
+            return c.equals("/temp") || c.startsWith("/temp ");
+        }
+        @Override public Result execute(String input, Context context) {
+            String arg = input.length() > "/temp".length() ? input.substring("/temp".length()).trim() : "";
+            if (arg.isEmpty()) {
+                Double t = context.temperature().get();
+                System.out.println("Temperature: " + (t == null ? "(configured default)" : t));
+                System.out.println("Set with: /temp 0.7   (higher = more creative, lower = more deterministic)");
+                return Result.HANDLED;
+            }
+            if ("reset".equalsIgnoreCase(arg)) {
+                context.temperature().set(null);
+                System.out.println("Temperature reset to configured default.\n");
+                return Result.HANDLED;
+            }
+            try {
+                double value = Double.parseDouble(arg);
+                if (value < 0.0 || value > 2.0) {
+                    System.out.println("Temperature must be between 0.0 and 2.0\n");
+                    return Result.HANDLED;
+                }
+                context.temperature().set(value);
+                System.out.println("Temperature set to: " + value + "\n");
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid temperature: " + arg + "\n");
+            }
             return Result.HANDLED;
         }
     }

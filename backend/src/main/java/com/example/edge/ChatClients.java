@@ -1,6 +1,7 @@
 package com.example.edge;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -53,6 +54,23 @@ public class ChatClients {
             .user(message)
             .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, chatId))
             .stream()
+            .content();
+    }
+
+    /**
+     * BLUEPRINT Step 10: RAG chat – retrieval-augmented generation via the given
+     * {@link QuestionAnswerAdvisor} (similarity search results are folded into the prompt).
+     * The advisor bean only exists when a VectorStore is configured.
+     */
+    public String ragChat(String chatId, String message, QuestionAnswerAdvisor ragAdvisor) {
+        if (chatId == null || chatId.trim().isEmpty()) {
+            return "User ID cannot be empty.";
+        }
+        return chatClient.prompt()
+            .user(message)
+            .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, chatId + "-rag"))
+            .advisors(ragAdvisor)
+            .call()
             .content();
     }
 }

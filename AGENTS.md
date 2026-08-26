@@ -19,7 +19,7 @@ cd polyglot && java -jar target/polyglot-runner.jar  # Polyglot MCP server (port
 From top level (`Duke42/`):
 
 ```bash
-mvn test # all modules: spring-ai-cli-agent 46 + backend 10
+mvn test # all modules: spring-ai-cli-agent 64 + backend 14
 mvn test -pl spring-ai-cli-agent -am # only CLI agent
 mvn test -pl backend -am # only backend
 ```
@@ -27,12 +27,13 @@ mvn test -pl backend -am # only backend
 From module:
 
 ```bash
-# CLI Agent: 46 tests (43 unit/integration + 3 evals skipped without Ollama)
+# CLI Agent: 64 tests (59 run + 3 evals skipped without -Devals=true + Ollama,
+# plus 2 Docker-gated opt-ins: -Dtc.ollama=true, -Dtc.pgvector=true)
 cd spring-ai-cli-agent && mvn test
 # opt-in evals with Ollama gemma4:e4b (or gemma4:e4b-mlx via -Dspring.ai.ollama.chat.options.model)
 cd spring-ai-cli-agent && mvn test -Devals=true
 
-# Backend: unit + GraphQL tests only (10 tests; no Ollama required)
+# Backend: unit + GraphQL tests only (14 tests; no Ollama required)
 cd backend && mvn test
 # Backend full verification: unit tests, package, then E2E via failsafe (4 e2e; requires Ollama)
 cd backend && mvn clean verify
@@ -44,7 +45,7 @@ cd backend && mvn test -Dmcp.integration=true # or mvn test -Dmcp.integration=tr
 
 | Module | Purpose | Port | Tests |
 |--------|---------|------|-------|
-| `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | 46 (43 unit/integration + 3 evals skipped) |
+| `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | 64 (3 evals + 2 Docker-gated opt-in) |
 | `backend/` | Enterprise demo (Vaadin + REST + GraphQL + MCP) | 8080 | 14 (10 unit + 4 e2e via failsafe) |
 | `polyglot/` | GraalVM Python integration (MCP server) | 9000 | 3 (integration) |
 | `ui/` | Legacy JavaFX desktop client (optional, not in parent build) | — | — |

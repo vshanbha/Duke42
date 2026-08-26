@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.*;
 class EdgeController {
 
     private final ChatClients chatClients;
+    private final ChatService chatService;
 
-    EdgeController(ChatClients chatClients) {
+    EdgeController(ChatClients chatClients, ChatService chatService) {
         this.chatClients = chatClients;
+        this.chatService = chatService;
     }
 
     @PostMapping(value = "/infer", consumes = MediaType.TEXT_PLAIN_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
@@ -38,5 +40,13 @@ class EdgeController {
             @Parameter(description = "Unique chat session ID") @PathVariable String chatId,
             @Parameter(description = "The message to send") @RequestParam String message) {
         return chatClients.toolChat(chatId, message);
+    }
+
+    @PostMapping(value = "/ragChat/{chatId}", consumes = MediaType.TEXT_PLAIN_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
+    @Operation(summary = "RAG chat", description = "Retrieval-augmented chat (falls back to plain memory chat when no VectorStore is configured)")
+    public String ragChat(
+            @Parameter(description = "Unique chat session ID") @PathVariable String chatId,
+            @Parameter(description = "The message to send") @RequestParam String message) {
+        return chatService.ragChat(chatId, message);
     }
 }

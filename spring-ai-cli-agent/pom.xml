@@ -21,6 +21,7 @@
     <properties>
         <java.version>17</java.version>
         <spring-ai.version>2.0.0</spring-ai.version>
+        <testcontainers-ollama.version>1.21.3</testcontainers-ollama.version>
     </properties>
 
     <dependencyManagement>
@@ -44,14 +45,61 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-mcp-client</artifactId>
         </dependency>
+        <!-- RAG (BLUEPRINT Step 10): library only – no starter, so no auto-config surprises;
+             PgVectorStore/JdbcTemplate/DataSource are wired manually in RagConfiguration -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-pgvector-store</artifactId>
+        </dependency>
+        <!-- RAG-as-Advisor: QuestionAnswerAdvisor (similarity retrieval into the prompt) -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-vector-store-advisor</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springaicommunity</groupId>
             <artifactId>spring-ai-agent-utils</artifactId>
             <version>0.10.0</version>
         </dependency>
+        <!-- Observability (BLUEPRINT Step 14): web server hosts /actuator/metrics;
+             ChatModel calls are observed automatically via Micrometer
+             (gen_ai.client.token.usage etc.) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Testing/Evaluation (BLUEPRINT Step 15): Testcontainers support with
+             OllamaContainer @ServiceConnection – container-gated tests opt in via Docker -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>ollama</artifactId>
+            <version>${testcontainers-ollama.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers-ollama.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${testcontainers-ollama.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

@@ -1132,9 +1132,9 @@ Create `UserVisibleToolCallbackTest.java` (pure trace `passesArgumentsThroughUnc
 From top level (`Duke42/`):
 
 ```bash
-mvn test # 46 tests: 43 unit/integration + 3 evals skipped (add -Devals=true + Ollama gemma4:e4b-mlx for evals)
-mvn test -Devals=true # same as above but runs ToolCallingEvalTest 3 with gemma4:e4b-mlx
-mvn test -pl backend # 10 tests
+mvn test # CLI agent: 64 tests (3 evals skipped – add -Devals=true + Ollama gemma4:e4b-mlx; 2 Docker-gated opt-ins)
+mvn test -Devals=true # same as above but runs ToolCallingEvalTest 3 with real Ollama model
+mvn test -pl backend # 14 tests
 ```
 
 No `-Dtest=...` needed – general setup covers all.
@@ -1144,6 +1144,82 @@ No `-Dtest=...` needed – general setup covers all.
 * JUnit 5 + AssertJ + Mockito – `mock(ChatModel.class)`, `ArgumentCaptor<Prompt>`, `verify(chatModel).call`
 * `ChatClientIntegrationTest` vs `ToolCallingEvalTest` – mocked vs real `gemma4:e4b-mlx` with `ChatMemory.CONVERSATION_ID`
 * `spring-boot-starter-test` – `test` scope, surefire `JUnitPlatformProvider`
+
+---
+
+## Step 9: Advanced Features (BLUEPRINT Steps 2/7–10/14/15)
+
+These close the gap to [`BLUEPRINT-CLI-Agent.md`](BLUEPRINT-CLI-Agent.md). All commands live in the running CLI (`mvn spring-boot:run`).
+
+### 9.1 Prompts & ChatOptions — `/role`, `/temp` (Steps 2)
+
+The system prompt is a `PromptTemplate` with a `{role}` placeholder (`SystemPrompts.SYSTEM_TEMPLATE`), rendered once with the default role for the ChatClient and per-request when overridden:
+
+```
+/role math tutor        # renders {role} into the system prompt for subsequent turns
+/temp 0.9               # per-call OllamaChatOptions temperature (0.0–2.0)
+/temp reset
+```
+
+### 9.2 Structured Output — `/convert` (Step 7)
+
+`UnitConversion` record → `BeanOutputConverter<UnitConversion>.getJsonSchema()` → `OllamaChatOptions.builder().outputSchema(schema)`:
+
+```
+/convert 100 km miles
+# Model answer is schema-validated JSON parsed into UnitConversion(value=62.14, unit=miles)
+```
+
+### 9.3 Multimodality — `/image` (Step 8)
+
+Vision via `UserMessage.builder().media(Media.builder()...)`:
+
+```
+/image /tmp/pic.png What do you see?
+# Mac MLX note: gemma4:e4b-mlx rejects images ("does not support image input") –
+# run /model minicpm-v4.6 first; Linux/CI gemma4:e4b does vision natively.
+```
+
+### 9.4 Model Switching — `/model` (Step 9)
+
+Per-call model override via `OllamaChatOptions.model(String)`:
+
+```
+/model lfm2.5     # switch mid-conversation
+/model            # show current override
+/model reset      # back to configured default
+```
+
+### 9.5 RAG + PgVector (Step 10)
+
+ETL in `rag/IngestionService` (TextReader → TokenTextSplitter → VectorStore.add), retrieval as `QuestionAnswerAdvisor` wired in `RagConfiguration` – gated behind `rag.enabled=true` exactly like the MCP client:
+
+```bash
+docker compose up -d ollama pgvector
+cd spring-ai-cli-agent && mvn spring-boot:run \
+  -Dspring-boot.run.arguments="--rag.enabled=true --rag.ingest.on-startup=true"
+# Ask: What does AskUserQuestionTool do?  → grounded from ingested TUTORIAL.md chunks
+```
+
+Backend parity: root `com.example.edge.ChatService` exposes chat/chatStream/**ragChat** (`POST /edge/ragChat/{chatId}`); without a VectorStore bean it falls back to plain memory-backed chat.
+
+### 9.6 Observability (Step 14)
+
+Micrometer observation of ChatModel calls is native in Spring AI 2.0.0 (there is no separate `ObservationAdvisor` class) – the web+actuator starters expose it:
+
+```bash
+curl localhost:8081/actuator/metrics/gen_ai.client.token.usage   # token counts after your first chat
+```
+
+### 9.7 Testcontainers (Step 15)
+
+`pom.xml` now carries `spring-ai-spring-boot-testcontainers` + `org.testcontainers:ollama` (+ junit-jupiter/postgresql). Two Docker-gated tests stay out of default runs:
+
+```bash
+cd spring-ai-cli-agent
+mvn test -Dtc.ollama=true    # OllamaContainer @ServiceConnection wiring smoke test
+mvn test -Dtc.pgvector=true  # RagConfiguration against real pgvector/pgvector:pg16
+```
 
 ---
 
