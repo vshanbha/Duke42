@@ -53,3 +53,18 @@ Both IDs verified present in https://opencode.ai/zen/go/v1/models on
 
 No other file needs touching. `claude_*`/`codex_*` tiers stay blank on purpose:
 those harnesses are unused here and blank means "keep their own defaults".
+
+## #4 — Local override of spec-writer role: Ginkgo → JUnit 5 + AssertJ (2026-08-26)
+
+The template's `spec-writer.md` is Go-specific ("Writes Ginkgo acceptance
+specs", "You write ONLY test files (*_test.go)"). Duke42 is Java: the blessed
+stack per the java pack itself is JUnit 5 + AssertJ + Testcontainers, and our
+test-file convention is `(Test|Tests|IT|ITCase)\.java$` under `src/test/java`.
+
+Decision: locally override the wording in `.opencode/agent/spec-writer.md`
+(description + body), regenerate adapters with `make sync-harnesses`.
+
+Consequence: `.opencode/agent/spec-writer.md` now differs from upstream v0.1.5.
+`./factory upgrade` may report or overwrite it — if so, re-apply this Decision's
+wording rather than silently reverting to Ginkgo. Filed as an upstream note via
+the java-pack discussion (#66) since other Maven/Java adopters hit the same leak.
