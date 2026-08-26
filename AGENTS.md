@@ -162,6 +162,11 @@ decisions: [`docs/DECISION_LOG.md`](docs/DECISION_LOG.md).
   `mvn -q test '-Dtest=!ChatClientIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false && ./scripts/hooks/junit5-only-check.sh`
 - **Push gate**: `git config core.hooksPath .githooks` (one-time per clone).
 - **Doctor / report**: `./factory doctor`, `./factory report`.
+- **Model tiers** (Decision #3): frontier = `opencode-go/muse-spark-1.2-contributor`
+  (spec-writer, reviewer); default & economy = `opencode-go/ox-alpha-free`
+  (implementer, refactorer, wiki-maintainer, harness default).
+  **To swap models at runtime**: edit the three `opencode_*_model` keys in
+  [`factory.yaml`](factory.yaml) → run `make sync-harnesses` → land via PR.
 - Java pack is upstream-"experimental": Spotless/Error Prone/SpotBugs/PIT are NOT
   wired into these Maven poms yet (Decision #2).
 
