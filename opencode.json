@@ -41,7 +41,8 @@
       "permission": {
         "edit": "ask",
         "bash": "ask"
-      }
+      },
+      "model": "opencode-go/muse-spark-1.2-contributor"
     },
     "implementer": {
       "description": "Makes failing tests pass. Cannot edit test files (test-edit denial hook).",
@@ -49,7 +50,8 @@
       "permission": {
         "edit": "ask",
         "bash": "ask"
-      }
+      },
+      "model": "opencode-go/ox-alpha-free"
     },
     "refactorer": {
       "description": "Cleans up code while keeping tests green without changing behavior.",
@@ -57,7 +59,8 @@
       "permission": {
         "edit": "ask",
         "bash": "ask"
-      }
+      },
+      "model": "opencode-go/ox-alpha-free"
     },
     "wiki-maintainer": {
       "description": "Reads your spec source and writes wiki/ pages. Supervised — every edit is a PR and requires human review.",
@@ -65,7 +68,8 @@
       "permission": {
         "edit": "ask",
         "bash": "deny"
-      }
+      },
+      "model": "opencode-go/ox-alpha-free"
     },
     "reviewer": {
       "description": "Adversarial code review. Frontier model. Never the same model that wrote the code.",
@@ -73,7 +77,8 @@
       "permission": {
         "edit": "deny",
         "bash": "ask"
-      }
+      },
+      "model": "opencode-go/muse-spark-1.2-contributor"
     }
   },
   "mcp": {
@@ -90,5 +95,7 @@
   },
   "plugin": [
     ".opencode/plugin/factory-hooks.ts"
-  ]
+  ],
+  "model": "opencode-go/ox-alpha-free",
+  "small_model": "opencode-go/ox-alpha-free"
 }
