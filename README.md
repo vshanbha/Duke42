@@ -41,7 +41,7 @@ Duke42 has two sides: a **learning path** (Spring AI CLI Agent) and an **enterpr
 - **Web UI**: Vaadin chat interface for enterprise demos
 - **REST API**: For JavaScript/React developers
 - **GraphQL**: Flexible query layer for JS/React clients
-- **Tested**: 46 tests (31 CLI + 15 backend)
+- **Tested**: 78 tests (64 CLI + 14 backend)
 
 ---
 
@@ -101,14 +101,24 @@ mvn spring-boot:run
 **5. Run tests**
 
 ```bash
-# CLI Agent tests (39 tests)
+# CLI Agent tests (64 tests; 3 evals need -Devals=true + Ollama,
+# 2 Docker-gated: -Dtc.ollama=true / -Dtc.pgvector=true)
 cd spring-ai-cli-agent && mvn test
 
-# Backend unit + GraphQL tests only (10 tests; no Ollama required)
+# Backend unit + GraphQL tests only (14 tests)
 cd backend && mvn test
 
 # Backend full verification: unit tests, package, then E2E (requires Ollama)
 cd backend && mvn clean verify
+```
+
+**6. Optional: RAG with pgvector** (BLUEPRINT Step 10)
+
+```bash
+docker compose up -d ollama pgvector
+cd spring-ai-cli-agent && mvn spring-boot:run \
+  -Dspring-boot.run.arguments="--rag.enabled=true --rag.ingest.on-startup=true"
+# Then ask about anything in TUTORIAL.md – answers are grounded via QuestionAnswerAdvisor
 ```
 
 ---
@@ -127,6 +137,11 @@ cd backend && mvn clean verify
 | 8 | Unit Testing | JUnit 5, AssertJ, Mockito |
 | 9 | Enterprise Backend (Optional) | Vaadin Web UI + REST API + GraphQL |
 | 10 | Streaming Responses | Real-time token output in CLI and Vaadin |
+| 11 | Structured Output | `BeanOutputConverter` JSON schema, `/convert` command |
+| 12 | Multimodality | Vision via `Media`, `/image` command |
+| 13 | Model Switching | Per-call `ChatOptions`, `/model` + `/temp` commands |
+| 14 | RAG + PgVector | ETL pipeline, `QuestionAnswerAdvisor`, docker-compose dev services |
+| 15 | Observability | Micrometer, `/actuator/metrics` (`gen_ai.*`) |
 
 **Full tutorial**: [TUTORIAL.md](TUTORIAL.md)
 

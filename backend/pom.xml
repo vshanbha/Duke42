@@ -53,6 +53,13 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-mcp-client</artifactId>
         </dependency>
+        <!-- BLUEPRINT Step 10: RAG-as-Advisor API (QuestionAnswerAdvisor) – the advisor bean
+             itself is only present when a VectorStore is configured; ChatService falls back
+             to plain chat otherwise -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-vector-store-advisor</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.vaadin</groupId>
             <artifactId>vaadin-spring-boot-starter</artifactId>

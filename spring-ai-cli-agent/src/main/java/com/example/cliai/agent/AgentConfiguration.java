@@ -7,6 +7,7 @@ import org.springaicommunity.agent.utils.CommandLineQuestionHandler;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
@@ -21,7 +22,9 @@ import org.springframework.context.annotation.Configuration;
 class AgentConfiguration {
 
     @Bean
-    ChatClient chatClient(ChatModel chatModel, ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider) {
+    ChatClient chatClient(ChatModel chatModel,
+                          ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider,
+                          ObjectProvider<QuestionAnswerAdvisor> ragAdvisor) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
             .maxMessages(20)
             .build();
@@ -40,15 +43,19 @@ class AgentConfiguration {
             .toArray(ToolCallback[]::new);
 
         ChatClient.Builder builder = ChatClient.builder(chatModel)
-            .defaultSystem("""
-                You are an interactive CLI assistant.
-                Be helpful, concise. If you need information, a preference, confirmation, or disambiguation from the user, use an available tool to ask - never ask in ordinary assistant text. After receiving the tool result, continue with the response.
-                """)
-            .defaultToolCallbacks(allWithTrace)
-            .defaultAdvisors(
-                new SimpleLoggerAdvisor(),
-                MessageChatMemoryAdvisor.builder(chatMemory).build()
-            );
+            .defaultSystem(SystemPrompts.render(null))
+            .defaultToolCallbacks(allWithTrace);
+
+        // BLUEPRINT Step 14: SimpleLoggerAdvisor stays for request/response trace; token/metric
+        // observability is native – ChatModel observations are exported via Micrometer/actuator
+        // (no separate ObservationAdvisor exists in Spring AI 2.0.0).
+        builder.defaultAdvisors(
+            new SimpleLoggerAdvisor(),
+            MessageChatMemoryAdvisor.builder(chatMemory).build()
+        );
+
+        // BLUEPRINT Step 10: RAG advisor is optional like MCP – present only when rag.enabled=true
+        ragAdvisor.ifAvailable(builder::defaultAdvisors);
 
         mcpProvider.ifAvailable(provider -> builder.defaultTools(provider));
 

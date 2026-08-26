@@ -31,6 +31,22 @@ public interface SlashCommand {
         NOT_HANDLED
     }
 
-    /** Context passed to commands (session, I/O, etc.) */
-    record Context(java.util.concurrent.atomic.AtomicReference<String> sessionId) {}
+    /**
+     * Context passed to commands (session, I/O, etc.).
+     * Preference overrides are optional per-call {@code ChatOptions} inputs
+     * (BLUEPRINT Steps 2/9: temperature, model switching).
+     */
+    record Context(
+            java.util.concurrent.atomic.AtomicReference<String> sessionId,
+            java.util.concurrent.atomic.AtomicReference<String> role,
+            java.util.concurrent.atomic.AtomicReference<String> modelOverride,
+            java.util.concurrent.atomic.AtomicReference<Double> temperature) {
+
+        public Context(java.util.concurrent.atomic.AtomicReference<String> sessionId) {
+            this(sessionId,
+                 new java.util.concurrent.atomic.AtomicReference<>(null),
+                 new java.util.concurrent.atomic.AtomicReference<>(null),
+                 new java.util.concurrent.atomic.AtomicReference<>(null));
+        }
+    }
 }

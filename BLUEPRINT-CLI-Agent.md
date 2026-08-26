@@ -6,6 +6,12 @@
 
 > **Reference map:** This blueprint tracks `Spring AI Reference` top-level: `Chat Client API`, `Prompts`, `Structured Output`, `Multimodality`, `Models` (Chat/Embedding/Image/Audio/Moderation), `Chat Memory`, `Tool Calling`, `MCP`, `RAG`, `Vector Databases`, `Evaluation`, `Observability`, `Dev-time Services`, `Testing`.
 
+> **✅ IMPLEMENTATION STATUS (2026-08-26):** All 15 steps implemented in `spring-ai-cli-agent` (+ backend RAG parity). Verified deviations from this document as written:
+> - **Step 10 retrieval**: Spring AI 2.0.0 ships `QuestionAnswerAdvisor` (`spring-ai-vector-store-advisor`), not a `VectorStoreSimilarityRetriever`; ETL = `TextReader` → `TokenTextSplitter` → `PgVectorStore.add`. RAG is property-gated (`rag.enabled=true`) like MCP.
+> - **Step 14**: There is no `ObservationAdvisor` class in Spring AI 2.0.0 – ChatModel observation is native Micrometer; `SimpleLoggerAdvisor` stays for trace and `/actuator/metrics/gen_ai.client.token.usage` provides metrics (CLI got web+actuator starters).
+> - **Step 15 poms**: `spring-boot-starter-parent` does not manage Testcontainers versions – pinned via `testcontainers-ollama.version`; container tests are opt-in (`-Dtc.ollama=true`, `-Dtc.pgvector=true`) to keep default runs dependency-free.
+> - **docker-compose.yml** is a superset: backend + polyglot app services plus ollama + pgvector dev-time services.
+
 ---
 
 ## PREREQUISITES
@@ -275,10 +281,16 @@ After all 15 steps, the project has:
     <dependencies>
         <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-starter-model-ollama</artifactId></dependency>
         <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-starter-mcp-client</artifactId></dependency>
+        <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-pgvector-store</artifactId></dependency>
+        <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-vector-store-advisor</artifactId></dependency>
         <dependency><groupId>org.springaicommunity</groupId><artifactId>spring-ai-agent-utils</artifactId><version>0.10.0</version></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
         <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-spring-boot-testcontainers</artifactId><scope>test</scope></dependency>
-        <dependency><groupId>org.testcontainers</groupId><artifactId>ollama</artifactId><scope>test</scope></dependency>
+        <dependency><groupId>org.testcontainers</groupId><artifactId>ollama</artifactId><version>${testcontainers-ollama.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId><version>${testcontainers-ollama.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><version>${testcontainers-ollama.version}</version><scope>test</scope></dependency>
     </dependencies>
     <build><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
 </project>
@@ -292,20 +304,31 @@ spring.ai.ollama.chat.options.model=gemma4:e4b
 spring.ai.ollama.chat.think=medium
 spring.ai.mcp.client.enabled=false
 spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
+management.endpoints.web.exposure.include=health,info,metrics
+rag.enabled=false
+rag.datasource.url=jdbc:postgresql://localhost:5432/vector
+rag.vectorstore.dimensions=768
 server.port=8081
 ```
 
 ### `docker-compose.yml` (dev-time services)
+
+The repo compose file additionally carries the backend + polyglot app services; the dev-time services per this blueprint:
 
 ```yaml
 services:
   ollama:
     image: ollama/ollama:latest
     ports: ["11434:11434"]
+    volumes: ["ollama-models:/root/.ollama"]
   pgvector:
     image: pgvector/pgvector:pg16
     ports: ["5432:5432"]
     environment: [POSTGRES_DB=vector, POSTGRES_USER=postgres, POSTGRES_PASSWORD=postgres]
+    volumes: ["pgvector-data:/var/lib/postgresql/data"]
+volumes:
+  ollama-models:
+  pgvector-data:
 ```
 
 ---

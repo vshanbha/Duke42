@@ -25,4 +25,19 @@ class EdgeControllerTest {
     void shouldHaveChatClientsInjected() {
         assertThat(chatClients).isNotNull();
     }
+
+    @Test
+    void shouldExposeRagChatEndpoint() throws Exception {
+        org.springframework.test.web.servlet.MockMvc mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
+            .standaloneSetup(edgeController).build();
+        org.mockito.Mockito.when(chatClients.chat("rag-1", "hello")).thenReturn("hi");
+
+        // RAG endpoint falls back to plain chat when no QuestionAnswerAdvisor bean exists (test context has none)
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/edge/ragChat/rag-1?message=hello")
+                .contentType(org.springframework.http.MediaType.TEXT_PLAIN))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(org.hamcrest.Matchers.containsString("hi")));
+    }
 }

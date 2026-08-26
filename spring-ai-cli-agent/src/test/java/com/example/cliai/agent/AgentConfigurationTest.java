@@ -12,6 +12,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
@@ -32,7 +33,8 @@ class AgentConfigurationTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider = mock(ObjectProvider.class);
 
-        ChatClient chatClient = config.chatClient(chatModel, mcpProvider);
+        ObjectProvider<QuestionAnswerAdvisor> ragProvider = mock(ObjectProvider.class);
+        ChatClient chatClient = config.chatClient(chatModel, mcpProvider, ragProvider);
 
         assertThat(chatClient).isNotNull();
     }
@@ -43,9 +45,10 @@ class AgentConfigurationTest {
         ChatModel chatModel = mock(ChatModel.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider = mock(ObjectProvider.class);
+        ObjectProvider<QuestionAnswerAdvisor> ragProvider = mock(ObjectProvider.class);
 
-        ChatClient client1 = config.chatClient(chatModel, mcpProvider);
-        ChatClient client2 = config.chatClient(chatModel, mcpProvider);
+        ChatClient client1 = config.chatClient(chatModel, mcpProvider, ragProvider);
+        ChatClient client2 = config.chatClient(chatModel, mcpProvider, ragProvider);
 
         assertThat(client1).isNotSameAs(client2);
     }
@@ -61,8 +64,10 @@ class AgentConfigurationTest {
 
         @SuppressWarnings("unchecked")
         ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider = mock(ObjectProvider.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<QuestionAnswerAdvisor> ragProvider = mock(ObjectProvider.class);
         AgentConfiguration config = new AgentConfiguration();
-        ChatClient chatClient = config.chatClient(chatModel, mcpProvider);
+        ChatClient chatClient = config.chatClient(chatModel, mcpProvider, ragProvider);
 
         chatClient.prompt().user("Hello").advisors(a -> a.param(org.springframework.ai.chat.memory.ChatMemory.CONVERSATION_ID, "test-1")).call().content();
 

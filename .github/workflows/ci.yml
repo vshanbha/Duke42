@@ -39,6 +39,9 @@ jobs:
     - name: Test CLI Agent
       run: cd spring-ai-cli-agent && mvn test -q
 
+    - name: Test CLI Agent RAG wiring against pgvector (Docker-gated)
+      run: cd spring-ai-cli-agent && mvn test -Dtest=RagConfigurationTest -Dtc.pgvector=true -q
+
     - name: Build Backend (unit tests + package + E2E via failsafe)
       run: cd backend && mvn clean verify -q
 
