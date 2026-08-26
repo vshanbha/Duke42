@@ -7,6 +7,15 @@ on:
     branches: [ main ]
 
 jobs:
+  factory-gates:
+    name: Factory gate proofs (break/fix)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+    - name: Prove every installed gate fires (scripts/selftest/run.sh)
+      run: ./scripts/selftest/run.sh
+
   test:
     runs-on: ubuntu-latest
 

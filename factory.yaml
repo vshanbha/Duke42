@@ -1,0 +1,53 @@
+# Software Factory configuration. Flat key: value only — one value per line.
+# Lists are space-separated. Parsed by scripts/lib/config.sh. See Decision 2
+# in the template's docs/DECISION_LOG.md.
+project_name: duke42
+decision_log: docs/DECISION_LOG.md
+docs_root: docs
+citation_prefix: "SPEC_"
+protected_paths: "scripts/hooks .github/workflows"
+test_file_patterns: "(Test|Tests|IT|ITCase)\.java$"
+language_packs: "java"
+# Duke42 is Maven (no Gradle wrapper) – pack's Gradle command overridden per
+# docs/DECISION_LOG.md #2. Exclusions keep the gate deterministic offline:
+# ChatClientIntegrationTest needs a locally pulled LLM model; -Dtest replaces
+# surefire's default includes, so failsafe-only E2EIT must be excluded too.
+check_command: "mvn -q test '-Dtest=!ChatClientIntegrationTest,!E2EIT' -Dsurefire.failIfNoSpecifiedTests=false && ./scripts/hooks/junit5-only-check.sh"
+# Your own hooks go here, not in hook-existence-check.sh (a framework file
+# that upgrade overwrites). Space-separated paths.
+local_hooks: ""
+wiki_root: wiki
+wiki_staleness: false
+
+# ── Identity ─────────────────────────────────────────────────────────
+project_display_name: "Duke42"
+github_owner: "@vshanbha"
+opencode_username: "duke42-founder"
+
+# ── Models ───────────────────────────────────────────────────────────
+# Which provider seeded the tiers below. Blank tiers mean "inherit": sync writes
+# nothing and each harness keeps its own model. See docs/MODELS.md.
+cost_profile: "standard"
+model_provider: "inherit"
+opencode_frontier_model: ""
+opencode_default_model: ""
+opencode_economy_model: ""
+claude_frontier_model: ""
+claude_default_model: ""
+claude_economy_model: ""
+codex_frontier_model: ""
+codex_default_model: ""
+codex_economy_model: ""
+
+# ── Advisory adversarial PR review ───────────────────────────────────
+# Opt-in; costs tokens per PR and needs the repository secret named below.
+# Toggle with: ./factory review-lane enable|disable
+review_lane: "off"
+review_model: ""
+review_api_key_secret: "OPENROUTER_API_KEY"
+
+# ── Toolchain versions ───────────────────────────────────────────────
+go_version: "1.26"
+java_version: "21"
+node_version: "24"
+java_min_version: "21"
