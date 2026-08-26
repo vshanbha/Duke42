@@ -164,6 +164,13 @@ decisions: [`docs/DECISION_LOG.md`](docs/DECISION_LOG.md).
 
 ### PR Workflow (how every change lands)
 
+> **AGENTS NEVER MERGE PRs. Full stop.**
+> An agent creates the PR when asked, verifies its gates, reports back, and
+> STOPS. Only the human merges. Every PR gets an `@reviewer` subagent pass
+> before it is reported as ready; substantial functionality additionally
+> requires explicit human review of the diff (Decision #6).
+> Origin: the adoption agent auto-merged PRs #1–#5 unasked; do not repeat that.
+
 Direct pushes to `main` are DENIED by `.githooks/pre-push` (`direct-main-push-block`).
 There is NO bypass env var; `--no-verify` defeats local gates but is a governance
 violation — don't. Branch protection is intentionally OFF (Decision #5: solo
@@ -176,13 +183,19 @@ maintainer); the local gate is the enforcement.
 3. Commit touches `factory.yaml`, `opencode.json`, `scripts/hooks`, or
    `.github/workflows`? It must reference a `docs/DECISION_LOG.md` number
 4. Push branch → `gh pr create`
-5. Both CI jobs must pass before merge:
+5. Both CI jobs must pass before the PR may be called ready:
    - `Factory gate proofs` (~30s break/fix selftest)
    - `test` (~8min full suite)
-6. For substantive code changes: run the adversarial subagent on the diff first —
-   `@reviewer` (muse-spark tier, edit-denied) per `workflows/review-diamond.md`;
-   post findings to the PR, address or rebut each one
-7. `gh pr merge N --merge --delete-branch`; sync back: `git checkout main && git pull`
+6. Run the adversarial subagent on the diff — `@reviewer` (muse-spark tier,
+   edit-denied) per `workflows/review-diamond.md`; post findings to the PR,
+   address or rebut each one. Mandatory for EVERY PR.
+7. **Report back and stop.** State what was done, PR URL, gate status,
+   reviewer findings. The human decides: review the diff (always for
+   substantial functionality) and run `gh pr merge N --merge --delete-branch`
+   themselves, then sync back: `git checkout main && git pull`.
+8. Enforcement honesty: no local hook can intercept `gh pr merge` (API call).
+   This is a write-time rule carried in this always-loaded file; hard options
+   if ever needed are listed under Decision #6.
 
 Quick reference — current state is always checkable via `gh pr list --state open`,
 `./factory doctor` (gate health), `./factory report` (what gates caught).
