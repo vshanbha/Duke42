@@ -164,6 +164,11 @@ decisions: [`docs/DECISION_LOG.md`](docs/DECISION_LOG.md).
 
 ### PR Workflow (how every change lands)
 
+> **AGENTS NEVER MERGE PRs. Full stop.**
+> Create → verify gates → report → stop. Every PR needs @reviewer;
+> substantial functionality additionally needs human diff review.
+> Origin: see Decision #6 (PRs #1–#5 were auto-merged without per-merge consent).
+
 Direct pushes to `main` are DENIED by `.githooks/pre-push` (`direct-main-push-block`).
 There is NO bypass env var; `--no-verify` defeats local gates but is a governance
 violation — don't. Branch protection is intentionally OFF (Decision #5: solo
@@ -176,13 +181,34 @@ maintainer); the local gate is the enforcement.
 3. Commit touches `factory.yaml`, `opencode.json`, `scripts/hooks`, or
    `.github/workflows`? It must reference a `docs/DECISION_LOG.md` number
 4. Push branch → `gh pr create`
-5. Both CI jobs must pass before merge:
+5. Both CI jobs must pass before the PR may be called ready:
    - `Factory gate proofs` (~30s break/fix selftest)
    - `test` (~8min full suite)
-6. For substantive code changes: run the adversarial subagent on the diff first —
-   `@reviewer` (muse-spark tier, edit-denied) per `workflows/review-diamond.md`;
-   post findings to the PR, address or rebut each one
-7. `gh pr merge N --merge --delete-branch`; sync back: `git checkout main && git pull`
+6. Run the adversarial subagent on the diff — `@reviewer` (muse-spark tier,
+   edit-denied) per `workflows/review-diamond.md`; post findings to the PR,
+   address or rebut each one. Mandatory for every PR; minor docs-only PRs
+   may be batched but the reviewer call is always made.
+7. **Report back and stop.** State what was done, PR URL, gate status,
+   reviewer findings. The human decides: review the diff (always for
+   substantial functionality) and run `gh pr merge N --merge --delete-branch`
+   themselves, then sync back: `git checkout main && git pull`.
+
+> **Addressing review findings on an unmerged PR:** add fixup commit(s) to the
+> same branch and force-push (`--force-with-lease`) — do NOT open a new PR.
+> Force-push re-triggers CI; update the PR body listing what was addressed or
+> rebutted. Batching trivial docs-only changes across multiple PRs into a
+> single reviewer call is acceptable (the call is never skipped).
+
+### Enforcement
+
+No local hook can intercept `gh pr merge` — it is a GitHub API call invisible
+to git hooks. This is a write-time rule in always-loaded context (AGENTS.md).
+Hard-enforcement options if ever needed: branch protection (Decision #5: declined
+while solo) or scoped GitHub credential without `contents: write` on `main`
+(fine-grained PAT: `contents: read`, `pull_requests: write`, `actions: read` —
+then `gh pr merge` returns 403). Audit: `gh pr view --json mergedBy` shows who
+merged (currently always `vshanbha`; no agent identity exists to distinguish).
+See Decision #6 for full discussion.
 
 Quick reference — current state is always checkable via `gh pr list --state open`,
 `./factory doctor` (gate health), `./factory report` (what gates caught).

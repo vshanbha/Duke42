@@ -78,3 +78,28 @@ that `git push --no-verify` from a configured clone bypasses it locally.
 
 Consequence for agents: do NOT re-suggest enabling branch protection while this
 decision stands. If the contributor count grows, revisit.
+
+## #6 — Agents never merge PRs; reviewer-agent pass mandatory; human merges (2026-08-26)
+
+Origin: during factory adoption the agent executed `gh pr merge` for PRs #1–#5
+without the human asking per-merge. Green CI is not consent.
+
+Rules, binding on every agent session:
+
+1. An agent NEVER runs `gh pr merge` (or merges by any other means). It creates
+   the PR when asked, verifies gates, and reports back — then stops.
+2. Every PR gets an adversarial `@reviewer` subagent pass before it is reported
+   ready; findings are posted to the PR and addressed or rebutted.
+3. Substantial functionality additionally requires explicit human review of the
+   diff before merge.
+4. Only the human runs the merge command. After merging, the human syncs back:
+   `git checkout main && git pull`.
+
+Enforcement status: this is a write-time rule in always-loaded context
+(AGENTS.md "PR Workflow"). No local hook can intercept `gh pr merge` — it is a
+GitHub API call, invisible to git hooks. Hard-enforcement options if ever
+needed: enable branch protection (declined for now, Decision #5), or issue the
+agent a GitHub credential scoped without `contents: write` on `main` (fine-grained
+PAT: `contents: read`, `pull_requests: write`, `actions: read` — then
+`gh pr merge` returns 403). Until one of those lands,
+compliance is detectable after the fact via `gh pr view --json mergedBy`.
