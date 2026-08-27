@@ -99,5 +99,7 @@ Enforcement status: this is a write-time rule in always-loaded context
 (AGENTS.md "PR Workflow"). No local hook can intercept `gh pr merge` — it is a
 GitHub API call, invisible to git hooks. Hard-enforcement options if ever
 needed: enable branch protection (declined for now, Decision #5), or issue the
-agent a scoped credential without merge permission. Until one of those lands,
+agent a GitHub credential scoped without `contents: write` on `main` (fine-grained
+PAT: `contents: read`, `pull_requests: write`, `actions: read` — then
+`gh pr merge` returns 403). Until one of those lands,
 compliance is detectable after the fact via `gh pr view --json mergedBy`.

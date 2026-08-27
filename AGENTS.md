@@ -165,11 +165,9 @@ decisions: [`docs/DECISION_LOG.md`](docs/DECISION_LOG.md).
 ### PR Workflow (how every change lands)
 
 > **AGENTS NEVER MERGE PRs. Full stop.**
-> An agent creates the PR when asked, verifies its gates, reports back, and
-> STOPS. Only the human merges. Every PR gets an `@reviewer` subagent pass
-> before it is reported as ready; substantial functionality additionally
-> requires explicit human review of the diff (Decision #6).
-> Origin: the adoption agent auto-merged PRs #1–#5 unasked; do not repeat that.
+> Create → verify gates → report → stop. Every PR needs @reviewer;
+> substantial functionality additionally needs human diff review.
+> Origin: see Decision #6 (PRs #1–#5 were auto-merged without per-merge consent).
 
 Direct pushes to `main` are DENIED by `.githooks/pre-push` (`direct-main-push-block`).
 There is NO bypass env var; `--no-verify` defeats local gates but is a governance
@@ -188,14 +186,23 @@ maintainer); the local gate is the enforcement.
    - `test` (~8min full suite)
 6. Run the adversarial subagent on the diff — `@reviewer` (muse-spark tier,
    edit-denied) per `workflows/review-diamond.md`; post findings to the PR,
-   address or rebut each one. Mandatory for EVERY PR.
+   address or rebut each one. Mandatory for every PR; minor docs-only PRs
+   may be batched but the reviewer call is always made.
 7. **Report back and stop.** State what was done, PR URL, gate status,
    reviewer findings. The human decides: review the diff (always for
    substantial functionality) and run `gh pr merge N --merge --delete-branch`
    themselves, then sync back: `git checkout main && git pull`.
-8. Enforcement honesty: no local hook can intercept `gh pr merge` (API call).
-   This is a write-time rule carried in this always-loaded file; hard options
-   if ever needed are listed under Decision #6.
+
+### Enforcement
+
+No local hook can intercept `gh pr merge` — it is a GitHub API call invisible
+to git hooks. This is a write-time rule in always-loaded context (AGENTS.md).
+Hard-enforcement options if ever needed: branch protection (Decision #5: declined
+while solo) or scoped GitHub credential without `contents: write` on `main`
+(fine-grained PAT: `contents: read`, `pull_requests: write`, `actions: read` —
+then `gh pr merge` returns 403). Audit: `gh pr view --json mergedBy` shows who
+merged (currently always `vshanbha`; no agent identity exists to distinguish).
+See Decision #6 for full discussion.
 
 Quick reference — current state is always checkable via `gh pr list --state open`,
 `./factory doctor` (gate health), `./factory report` (what gates caught).
