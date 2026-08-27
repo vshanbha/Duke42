@@ -192,6 +192,10 @@ maintainer); the local gate is the enforcement.
    reviewer findings. The human decides: review the diff (always for
    substantial functionality) and run `gh pr merge N --merge --delete-branch`
    themselves, then sync back: `git checkout main && git pull`.
+8. **Addressing review findings on an unmerged PR:** amend the existing
+   branch and force-push — do NOT create a new PR for fixes to an open PR.
+   Commit the fixes, force-push the same branch, re-run CI, and update the
+   PR description with what was addressed.
 
 ### Enforcement
 
