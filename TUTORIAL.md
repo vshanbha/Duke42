@@ -692,7 +692,7 @@ The jar includes all dependencies and the Spring Boot loader. Anyone with Java 1
 
 ### 7.3 Test Implementation
 
-No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`46 tests` with `gemma4:e4b-mlx`).
+No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`64 tests` with `gemma4:e4b-mlx`).
 
 ### 7.4 Further Reading
 
@@ -1334,14 +1334,14 @@ spring-ai-cli-agent/
 
 ## Complete application.properties
 
-> Checked-in default is `gemma4:e4b` (Linux/CI-friendly, `ollama pull gemma4:e4b`). For local Mac MLX use `application-local.properties` (see below) or `-Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx`.
+> Checked-in default is `gemma4:e4b-mlx` (Mac MLX, `ollama pull gemma4:e4b-mlx`). CI pins `gemma4:e4b` via `-Dspring.ai.ollama.chat.options.model=gemma4:e4b` (see `.github/workflows/ci.yml`).
 
 ```properties
 # Local Ollama endpoint and chat model used by Spring AI.
-# Checked-in default is gemma4:e4b (Linux/CI-friendly) – see ../../ollama-model-links.md
-# For local Mac (MLX) use gemma4:e4b-mlx via application-local.properties (not committed) or -Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx
+# Checked-in default is gemma4:e4b-mlx (Mac MLX) – see ../../ollama-model-links.md
+# CI pins the Linux build with -Dspring.ai.ollama.chat.options.model=gemma4:e4b (see .github/workflows/ci.yml)
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=gemma4:e4b
+spring.ai.ollama.chat.options.model=gemma4:e4b-mlx
 # Thinking: enable model thinking for gemma4/lfm2.5 (tools+thinking). Values: true/false/low/medium/high
 # See https://docs.spring.io/spring-ai/reference/api/chat/ollama-chat.html#_thinking_mode_reasoning and #_reasoning_content_via_openai_compatibility
 spring.ai.ollama.chat.think=medium

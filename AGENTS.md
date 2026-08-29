@@ -30,7 +30,7 @@ From module:
 # CLI Agent: 64 tests (59 run + 3 evals skipped without -Devals=true + Ollama,
 # plus 2 Docker-gated opt-ins: -Dtc.ollama=true, -Dtc.pgvector=true)
 cd spring-ai-cli-agent && mvn test
-# opt-in evals with Ollama gemma4:e4b (or gemma4:e4b-mlx via -Dspring.ai.ollama.chat.options.model)
+# opt-in evals with Ollama gemma4:e4b-mlx (local default) or gemma4:e4b (CI via -Dspring.ai.ollama.chat.options.model)
 cd spring-ai-cli-agent && mvn test -Devals=true
 
 # Backend: unit + GraphQL tests only (14 tests; no Ollama required)
@@ -72,7 +72,7 @@ cd backend && mvn test -Dmcp.integration=true # or mvn test -Dmcp.integration=tr
 - Backend unit tests use `@SpringBootTest` with Mockito
 - Backend e2e tests start jar as real process, test with Java HTTP client
 - Each test generates unique `chatId` (UUID) for isolation
-- Tests expect Ollama running locally with `gemma4:e4b` (Linux/CI, `ollama pull gemma4:e4b`) or `gemma4:e4b-mlx` on Mac (`application-local.properties` or `-Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx`)
+- Tests expect Ollama running locally with `gemma4:e4b-mlx` (default; already on the maintainer's Mac) or `gemma4:e4b` on CI/Linux (`ollama pull gemma4:e4b`, pinned via `-Dspring.ai.ollama.chat.options.model=gemma4:e4b`)
 - Spring AI CLI Agent tests use JUnit 5 + AssertJ + Mockito (no Ollama required); evals need Ollama (`-Devals=true`)
 
 ## Environment Requirements
@@ -80,7 +80,7 @@ cd backend && mvn test -Dmcp.integration=true # or mvn test -Dmcp.integration=tr
 - Java 17+ (for Spring Boot 4)
 - Maven 3.6+
 - GraalVM 21+ (for polyglot module only)
-- Ollama CLI with model: `gemma4:e4b` (or `gemma4:e4b-mlx` on Mac, `lfm2.5` still works but less reliable for AskUserQuestionTool)
+- Ollama CLI with model: `gemma4:e4b-mlx` (default, Mac) or `gemma4:e4b` on CI/Linux (`ollama pull gemma4:e4b`), `lfm2.5` still works but less reliable for AskUserQuestionTool
 
 ## Common Pitfalls
 

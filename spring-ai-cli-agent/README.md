@@ -13,11 +13,11 @@ Chat with a local LLM (Ollama) from your terminal. The agent has:
 ## Quick Start
 
 ```bash
-# Prerequisites: Java 17+, Maven, Ollama with gemma4:e4b (Linux/CI) or gemma4:e4b-mlx (Mac MLX, already downloaded)
-ollama pull gemma4:e4b # or gemma4:e4b-mlx on Mac
+# Prerequisites: Java 17+, Maven, Ollama with gemma4:e4b-mlx (default, Mac MLX, already downloaded) or gemma4:e4b (Linux/CI)
+ollama pull gemma4:e4b-mlx # default; CI uses gemma4:e4b via -Dspring.ai.ollama.chat.options.model=gemma4:e4b
 # Native Ollama thinking: spring.ai.ollama.chat.think=medium in application.properties
 
-# Run (uses gemma4:e4b; Mac MLX: --spring.profiles.active=local or -Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx)
+# Run (default model is gemma4:e4b-mlx; CI overrides to gemma4:e4b via -D)
 mvn spring-boot:run
 
 # Chat
@@ -51,9 +51,9 @@ spring-ai-cli-agent/
 │       ├── SlashCommand.java         # command pattern interface
 │       └── SlashCommandHandler.java  # registry for /help, /tools, /clear, /think, /exit
 ├── src/main/resources/
-│   ├── application.properties         # Ollama config (checked-in: gemma4:e4b)
-│   └── application-local.properties.example # local Mac MLX override (not committed)
-└── src/test/java/                    # 46 tests (43 unit/integration + 3 evals skipped)
+│   ├── application.properties         # Ollama config (checked-in default: gemma4:e4b-mlx)
+│   └── application-local.properties   # local Mac MLX override (git-ignored; not committed, example only)
+└── src/test/java/                    # 64 tests (59 run + 3 evals skipped + 2 Docker-gated opt-ins)
 ```
 
 ## Run Tests
@@ -61,35 +61,31 @@ spring-ai-cli-agent/
 From top level (`Duke42/`):
 
 ```bash
-mvn test # all modules (spring-ai-cli-agent 46 + backend 10)
+mvn test # all modules (spring-ai-cli-agent 64 + backend 14)
 mvn test -pl spring-ai-cli-agent -am # only CLI agent
 ```
 
 From `spring-ai-cli-agent/`:
 
 ```bash
-mvn test # 46 tests, 3 evals skipped without Ollama
-mvn test -Devals=true # opt-in model/tool-call evals, requires Ollama gemma4:e4b (or gemma4:e4b-mlx via -Dspring.ai.ollama.chat.options.model=gemma4:e4b-mlx or --spring.profiles.active=local)
+mvn test # 64 tests, 3 evals skipped without Ollama + 2 Docker-gated opt-ins
+mvn test -Devals=true # opt-in model/tool-call evals, requires Ollama gemma4:e4b-mlx (or gemma4:e4b via -Dspring.ai.ollama.chat.options.model=gemma4:e4b)
 ```
 
 All tests pass with general setup – no need to specify `-Dtest=...`. Evals exit `0` when model invokes expected tool (checked via `[Tool]` trace), non-zero when Ollama unavailable.
 
 ## Configuration
 
-Edit `src/main/resources/application.properties` (checked-in: `gemma4:e4b`, Linux/CI-friendly):
+Edit `src/main/resources/application.properties` (checked-in default: `gemma4:e4b-mlx`, Mac MLX):
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=gemma4:e4b  # Linux/CI: gemma4:e4b (9.6 GB); Mac MLX: gemma4:e4b-mlx (8.8 GB) via application-local.properties
+spring.ai.ollama.chat.options.model=gemma4:e4b-mlx  # default Mac MLX (8.8 GB); CI pins gemma4:e4b (9.6 GB) via -Dspring.ai.ollama.chat.options.model=gemma4:e4b
 # Full <10 GB tools-capable comparison: see ../ollama-model-links.md (single source of truth)
 ```
 
-Local Mac override – copy `application-local.properties.example` to `application-local.properties` (git-ignored) and run with `--spring.profiles.active=local`:
-
-```properties
-spring.ai.ollama.chat.options.model=gemma4:e4b-mlx
-```
-Or one-off: `mvn spring-boot:run -Dspring-boot.run.arguments=--spring.ai.ollama.chat.options.model=gemma4:e4b-mlx`
+CI override – the GitHub workflow runs `mvn test -Dspring.ai.ollama.chat.options.model=gemma4:e4b` on Linux.
+Or one-off: `mvn spring-boot:run -Dspring-boot.run.arguments=--spring.ai.ollama.chat.options.model=gemma4:e4b` # CI/Linux parity override
 
 ## How It Works
 
