@@ -61,13 +61,35 @@
             <artifactId>spring-ai-agent-utils</artifactId>
             <version>0.10.0</version>
         </dependency>
-        <!-- Observability (BLUEPRINT Step 14): web server hosts /actuator/metrics;
-             ChatModel calls are observed automatically via Micrometer
-             (gen_ai.client.token.usage etc.) -->
+        <!-- TUI / REPL: Spring Shell (JLine) owns the terminal, input history and
+             ANSI colouring – replaces the hand-rolled Scanner loop and raw escapes.
+             Runs as a non-web application (spring.main.web-application-type=none) so no
+             embedded server is started (clean exit, no Tomcat AsynchronousCloseException).
+             Shell 4.0.3 is built against Spring Boot 4.0.x; we override the Boot
+             baseline to 4.1.0 via the direct dependencies below. -->
+        <dependency>
+            <groupId>org.springframework.shell</groupId>
+            <artifactId>spring-shell-starter</artifactId>
+            <version>4.0.3</version>
+        </dependency>
+        <!-- JLine terminal/line-reader + ANSI support (transitive resolution was unreliable). -->
+        <dependency>
+            <groupId>org.springframework.shell</groupId>
+            <artifactId>spring-shell-jline</artifactId>
+            <version>4.0.3</version>
+        </dependency>
+        <!-- Force the Shell 4.0.3 transitive Boot 4.0.7 up to our 4.1.0 baseline. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <!-- Observability (BLUEPRINT Step 14): ChatModel calls are observed automatically
+             via Micrometer (gen_ai.client.token.usage etc.). Exposed over JMX since the
+             shell runs as a non-web application. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
