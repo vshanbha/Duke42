@@ -60,7 +60,7 @@ class ChatLoop {
     /** Spring Shell command: enter the interactive chat loop. */
     @Command(value = "chat", help = "Start an interactive chat session with the agent")
     public void chat() {
-        terminal.writer().println("Spring AI CLI Agent — type 'exit' or Ctrl-D to quit.\n");
+        terminal.writer().println("Spring AI CLI Agent — type 'exit' to leave the chat, Ctrl-D to abort.\n");
         terminal.writer().flush();
         // Build the LineReader locally: the auto-configured LineReader bean participates
         // in a circular dependency with the command registry, so we avoid injecting it.
@@ -75,10 +75,11 @@ class ChatLoop {
                 break;     // Ctrl-D: leave the chat
             }
             if (processLine(input)) {
-                break;
+                // 'exit'/'quit' was requested: return to the shell prompt. The shell's
+                // built-in 'exit' command terminates the JVM cleanly (no web server to stop).
+                return;
             }
         }
-        System.exit(0);
     }
 
     /**
