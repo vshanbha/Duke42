@@ -138,7 +138,7 @@ Create `src/main/resources/application.properties`:
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=lfm2.5
+spring.ai.ollama.chat.model=lfm2.5
 ```
 
 ### 1.2 Create the Entry Point
@@ -186,6 +186,8 @@ class AgentConfiguration {
 ### 1.4 Build the CLI Loop
 
 Create `src/main/java/com/example/cliai/cli/ChatLoop.java`:
+
+> **Note**: The Scanner/CommandLineRunner loop shown below is an earlier design step. The checked-in `ChatLoop.java` now uses **Spring Shell** (`@Command`) with JLine's `LineReader`/`Terminal` and `AttributedString` for colored output. See the `chat` command in the current source.
 
 ```java
 package com.example.cliai.cli;
@@ -1205,10 +1207,10 @@ Backend parity: root `com.example.edge.ChatService` exposes chat/chatStream/**ra
 
 ### 9.6 Observability (Step 14)
 
-Micrometer observation of ChatModel calls is native in Spring AI 2.0.0 (there is no separate `ObservationAdvisor` class) – the web+actuator starters expose it:
+Micrometer observation of ChatModel calls is native in Spring AI 2.0.0 (there is no separate `ObservationAdvisor` class) – the CLI exposes it via JMX (non-web Spring Shell):
 
 ```bash
-curl localhost:8081/actuator/metrics/gen_ai.client.token.usage   # token counts after your first chat
+Metrics (CLI) are exposed via JMX (`spring.jmx.enabled=true`); view `gen_ai.client.token.usage` with `jconsole`.
 ```
 
 ### 9.7 Testcontainers (Step 15)
@@ -1334,28 +1336,27 @@ spring-ai-cli-agent/
 
 ## Complete application.properties
 
-> Checked-in default is `gemma4:e4b-mlx` (Mac MLX, `ollama pull gemma4:e4b-mlx`). CI pins `gemma4:e4b` via `-Dspring.ai.ollama.chat.options.model=gemma4:e4b` (see `.github/workflows/ci.yml`).
+> Checked-in default is `gemma4:e4b-mlx` (Mac MLX, `ollama pull gemma4:e4b-mlx`). CI pins `gemma4:e4b` via `-Dspring.ai.ollama.chat.model=gemma4:e4b` (see `.github/workflows/ci.yml`).
 
 ```properties
 # Local Ollama endpoint and chat model used by Spring AI.
 # Checked-in default is gemma4:e4b-mlx (Mac MLX) – see ../../ollama-model-links.md
-# CI pins the Linux build with -Dspring.ai.ollama.chat.options.model=gemma4:e4b (see .github/workflows/ci.yml)
+# CI pins the Linux build with -Dspring.ai.ollama.chat.model=gemma4:e4b (see .github/workflows/ci.yml)
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=gemma4:e4b-mlx
+spring.ai.ollama.chat.model=gemma4:e4b-mlx
 # Thinking: enable model thinking for gemma4/lfm2.5 (tools+thinking). Values: true/false/low/medium/high
 # See https://docs.spring.io/spring-ai/reference/api/chat/ollama-chat.html#_thinking_mode_reasoning and #_reasoning_content_via_openai_compatibility
 spring.ai.ollama.chat.think=medium
 # MCP client is disabled by default so unit tests run without external dependencies.
 spring.ai.mcp.client.enabled=false
 spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
-server.port=8081
 ```
 
 Create `src/main/resources/application-local.properties` for local Mac (not committed, `**/application-local.properties` in `.gitignore`):
 
 ```properties
 # Local override for Mac (MLX) – run with --spring.profiles.active=local
-spring.ai.ollama.chat.options.model=gemma4:e4b-mlx
+spring.ai.ollama.chat.model=gemma4:e4b-mlx
 ```
 
 ## Complete AgentConfiguration.java
@@ -1463,6 +1464,8 @@ Exactly as in Steps 4.1/5.1 with `public class` and `context.setVariable("pi", M
 ## Complete ChatLoop.java
 
 > The checked-in `ChatLoop.java` is the streaming variant (Step 10 is already applied). It uses `UUID` session IDs, `/help`/`/tools`/`/clear` commands, and `stream().content().doOnNext().blockLast()` for token streaming. If you followed Steps 1-6 literally you have the simpler `call().content()` loop – replace it with this complete file to match the repo:
+>
+> **Note (2026-08)**: The code below shows the pre-Spring-Shell Scanner/CommandLineRunner design. The current `ChatLoop.java` uses Spring Shell (`@Command(value="chat")`) with JLine terminal integration. The core streaming logic (`streamAndPrint`) and slash commands are preserved but routed through the terminal writer for TTY-aware output. The app now runs as a non-web application (`spring.main.web-application-type=none`).
 
 ```java
 package com.example.cliai.cli;
@@ -1599,7 +1602,7 @@ The `backend/` module provides a Vaadin web UI and REST API for enterprise demos
 ### Architecture
 
 ```
-Backend (port 8080)          CLI Agent (port 8081)
+Backend (port 8080)          CLI Agent (non-web)
 ┌─────────────────┐          ┌─────────────────┐
 │  Vaadin Web UI  │          │  Terminal REPL   │
 │  /chat          │          │                 │

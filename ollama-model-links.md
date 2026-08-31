@@ -88,28 +88,28 @@
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=lfm2.5
+spring.ai.ollama.chat.model=lfm2.5
 ```
 
 ### Vision-Capable Edge Agent (qwen3.5:4b)
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=qwen3.5:4b
+spring.ai.ollama.chat.model=qwen3.5:4b
 ```
 
 ### Minimal Memory Agent (nemotron-3-nano:4b)
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=nemotron-3-nano:4b
+spring.ai.ollama.chat.model=nemotron-3-nano:4b
 ```
 
 ### Multimodal Agent (gemma4:e4b)
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=gemma4:e4b
+spring.ai.ollama.chat.model=gemma4:e4b
 ```
 
 ---
