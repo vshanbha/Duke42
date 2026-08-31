@@ -26,14 +26,14 @@ class UserVisibleToolCallbackTest {
     }
 
     @Test
-    void passesArgumentsThroughUnchangedForCalculatorTool() {
+    void passesArgumentsThroughUnchangedForGenericTool() {
         AtomicReference<String> received = new AtomicReference<>();
-        ToolCallback delegate = new StubToolCallback("CalculatorTool", received);
+        ToolCallback delegate = new StubToolCallback("Glob", received);
         UserVisibleToolCallback callback = new UserVisibleToolCallback(delegate);
 
-        callback.call("{\"expression\":\"2 + 2\"}");
+        callback.call("{\"pattern\":\"**/*.java\",\"path\":\".\"}");
 
-        assertThat(received.get()).isEqualTo("{\"expression\":\"2 + 2\"}");
+        assertThat(received.get()).isEqualTo("{\"pattern\":\"**/*.java\",\"path\":\".\"}");
     }
 
     @Test

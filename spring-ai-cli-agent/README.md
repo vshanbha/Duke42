@@ -6,8 +6,9 @@ A terminal-based AI assistant that teaches Spring AI concepts step by step.
 
 Chat with a local LLM (Ollama) from your terminal. The agent has:
 - **Conversation memory** — remembers what you said earlier
-- **Calculator tool** — evaluates math expressions
-- **Unit converter** — converts km/miles, kg/lbs, etc.
+- **File system tools** — read/write/edit files (sandboxed to project root)
+- **GlobTool** — find files by glob pattern
+- **GrepTool** — regex search across file contents
 - **Logging** — shows prompts and responses for debugging
 
 ## Quick Start
@@ -44,8 +45,8 @@ spring-ai-cli-agent/
 │   │   ├── AgentConfiguration.java   # ChatClient + tools + memory
 │   │   ├── UserVisibleToolCallback.java # pure trace embellishment
 │   │   └── tools/
-│   │       ├── CalculatorTool.java    # Math evaluator (SpEL)
-│   │       └── UnitConverterTool.java # Unit conversions
+│   │       ├── SandboxedGlobTool.java  # Sandbox wrapper for GlobTool
+│   │       └── SandboxedGrepTool.java  # Sandbox wrapper for GrepTool
 │   └── cli/
 │       ├── ChatLoop.java             # Terminal REPL
 │       ├── SlashCommand.java         # command pattern interface
@@ -53,7 +54,7 @@ spring-ai-cli-agent/
 ├── src/main/resources/
 │   ├── application.properties         # Ollama config (checked-in default: gemma4:e4b-mlx)
 │   └── application-local.properties   # local Mac MLX override (git-ignored; not committed, example only)
-└── src/test/java/                    # 64 tests (59 run + 3 evals skipped + 2 Docker-gated opt-ins)
+└── src/test/java/                    # 58 tests (53 run + 5 skipped: 3 evals + 2 Docker-gated)
 ```
 
 ## Run Tests
@@ -61,14 +62,14 @@ spring-ai-cli-agent/
 From top level (`Duke42/`):
 
 ```bash
-mvn test # all modules (spring-ai-cli-agent 64 + backend 14)
+mvn test # all modules (spring-ai-cli-agent 58 + backend 14)
 mvn test -pl spring-ai-cli-agent -am # only CLI agent
 ```
 
 From `spring-ai-cli-agent/`:
 
 ```bash
-mvn test # 64 tests, 3 evals skipped without Ollama + 2 Docker-gated opt-ins
+mvn test # 58 tests, 3 evals skipped without Ollama + 2 Docker-gated opt-ins
 mvn test -Devals=true # opt-in model/tool-call evals, requires Ollama gemma4:e4b-mlx (or gemma4:e4b via -Dspring.ai.ollama.chat.model=gemma4:e4b)
 ```
 
