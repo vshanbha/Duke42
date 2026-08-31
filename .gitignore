@@ -76,3 +76,6 @@ eval/results/mock-*.json
 memory/.pending-lesson-reminder
 memory/PENDING-LESSONS.md
 memory/.parity-stale
+
+# Spring Shell REPL command history (runtime artifact)
+spring-shell.log

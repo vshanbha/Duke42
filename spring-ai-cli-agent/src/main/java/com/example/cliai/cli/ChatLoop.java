@@ -1,12 +1,18 @@
 package com.example.cliai.cli;
 
-import java.util.Scanner;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.example.cliai.agent.SystemPrompts;
 import com.example.cliai.agent.tools.UnitConversion;
+import org.jline.reader.EndOfFileException;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.UserInterruptException;
+import org.jline.terminal.Terminal;
+import org.jline.utils.AttributedString;
+import org.jline.utils.AttributedStyle;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
@@ -14,74 +20,108 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.shell.core.command.annotation.Command;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
 
+/**
+ * Interactive chat REPL built on Spring Shell (JLine). The {@link #chat()} command
+ * owns the input loop; Spring Shell supplies the terminal, line editing, history
+ * and ANSI colouring. Coloured output uses JLine's {@link AttributedString}, which
+ * only emits escape codes on a real TTY (a dumb terminal gets plain text).
+ */
 @Component
-class ChatLoop implements CommandLineRunner {
+class ChatLoop {
 
     private static final String SESSION_ID_PREFIX = "session-";
     private static final String IMAGE_PREFIX = "/image ";
     private static final String CONVERT_PREFIX = "/convert ";
 
-    private final ChatClient chatClient;
+    private static final int THINKING_COLOR = AttributedStyle.CYAN;
+    private static final int AI_COLOR = AttributedStyle.GREEN;
 
-    ChatLoop(ChatClient chatClient) {
+    private final ChatClient chatClient;
+    private final Terminal terminal;
+
+    private final SlashCommandHandler slashHandler = new SlashCommandHandler();
+    private final AtomicReference<String> sessionId = new AtomicReference<>(SESSION_ID_PREFIX + UUID.randomUUID());
+    private final AtomicReference<String> role = new AtomicReference<>(null);
+    private final AtomicReference<String> modelOverride = new AtomicReference<>(null);
+    private final AtomicReference<Double> temperature = new AtomicReference<>(null);
+    private final SlashCommand.Context slashContext = new SlashCommand.Context(sessionId, role, modelOverride, temperature);
+
+    ChatLoop(ChatClient chatClient, Terminal terminal) {
         this.chatClient = chatClient;
+        this.terminal = terminal;
     }
 
-    @Override
-    public void run(String... args) {
-        System.out.println("\n╔══════════════════════════════════════╗");
-        System.out.println("║   Spring AI CLI Agent                ║");
-        System.out.println("║   Type 'exit' to quit                ║");
-        System.out.println("╚══════════════════════════════════════╝\n");
-
-        AtomicReference<String> sessionId = new AtomicReference<>(SESSION_ID_PREFIX + UUID.randomUUID());
-        AtomicReference<String> role = new AtomicReference<>(null);
-        AtomicReference<String> modelOverride = new AtomicReference<>(null);
-        AtomicReference<Double> temperature = new AtomicReference<>(null);
-        SlashCommandHandler slashHandler = new SlashCommandHandler();
-        SlashCommand.Context slashContext = new SlashCommand.Context(sessionId, role, modelOverride, temperature);
-        try (Scanner scanner = new Scanner(System.in)) {
-            while (true) {
-                System.out.print("You: ");
-                if (!scanner.hasNextLine()) {
-                    System.out.println("\nGoodbye!");
-                    break;
-                }
-                String input = scanner.nextLine();
-                SlashCommand.Result slashResult = slashHandler.handle(input, slashContext);
-                if (slashResult == SlashCommand.Result.EXIT) {
-                    break;
-                }
-                if (slashResult == SlashCommand.Result.HANDLED) {
-                    continue;
-                }
-
-                // BLUEPRINT Step 8: Multimodality – /image /tmp/pic.jpg What do you see?
-                if (input.startsWith(IMAGE_PREFIX)) {
-                    handleImageQuery(input, sessionId.get(), role, modelOverride, temperature);
-                    continue;
-                }
-                // BLUEPRINT Step 7: Structured Output – /convert 100 km miles
-                if (input.startsWith(CONVERT_PREFIX)) {
-                    handleConvert(input, sessionId.get(), modelOverride);
-                    continue;
-                }
-
-                try {
-                    ChatClient.ChatClientRequestSpec spec = buildSpec(input,
-                        sessionId.get(), role, modelOverride, temperature);
-                    streamAndPrint(spec);
-                } catch (Exception e) {
-                    System.out.println("\n[Error] " + e.getMessage() + "\n");
-                }
+    /** Spring Shell command: enter the interactive chat loop. */
+    @Command(value = "chat", help = "Start an interactive chat session with the agent")
+    public void chat() {
+        terminal.writer().println("Spring AI CLI Agent — type 'exit' to leave the chat, Ctrl-D to abort.\n");
+        terminal.writer().flush();
+        // Build the LineReader locally: the auto-configured LineReader bean participates
+        // in a circular dependency with the command registry, so we avoid injecting it.
+        LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
+        while (true) {
+            String input;
+            try {
+                input = lineReader.readLine("You: ");
+            } catch (UserInterruptException e) {
+                continue; // Ctrl-C: ignore and re-prompt
+            } catch (EndOfFileException e) {
+                break;     // Ctrl-D: leave the chat
+            }
+            if (processLine(input)) {
+                // 'exit'/'quit' was requested: return to the shell prompt. The shell's
+                // built-in 'exit' command terminates the JVM cleanly (no web server to stop).
+                return;
             }
         }
+    }
+
+    /**
+     * Process a single line of input.
+     * @return true if the loop should exit
+     */
+    boolean processLine(String input) {
+        String trimmed = input == null ? "" : input;
+        if (trimmed.isBlank()) {
+            return false;
+        }
+        SlashCommand.Result result = slashHandler.handle(trimmed, slashContext);
+        if (result == SlashCommand.Result.EXIT) {
+            return true;
+        }
+        if (result == SlashCommand.Result.HANDLED) {
+            return false;
+        }
+        if (trimmed.startsWith(IMAGE_PREFIX)) {
+            handleImageQuery(trimmed, sessionId.get(), role, modelOverride, temperature);
+            return false;
+        }
+        if (trimmed.startsWith(CONVERT_PREFIX)) {
+            handleConvert(trimmed, sessionId.get(), modelOverride);
+            return false;
+        }
+        try {
+            ChatClient.ChatClientRequestSpec spec = buildSpec(trimmed, sessionId.get(), role, modelOverride, temperature);
+            streamAndPrint(spec);
+        } catch (Exception e) {
+            terminal.writer().println("\n[Error] " + e.getMessage() + "\n");
+            terminal.writer().flush();
+        }
+        return false;
+    }
+
+    private void printColored(String text, int color, boolean bold) {
+        AttributedStyle style = AttributedStyle.DEFAULT.foreground(color);
+        if (bold) {
+            style = style.bold();
+        }
+        new AttributedString(text, style).print(terminal);
     }
 
     /**
@@ -135,12 +175,13 @@ class ChatLoop implements CommandLineRunner {
         return spec;
     }
 
-    /** BLUEPRINT Step 12/13: streaming with thinking indicator and [Thinking] trace. */
+    /** BLUEPRINT Step 12/13: streaming with thinking trace (cyan) and answer (green). */
     private void streamAndPrint(ChatClient.ChatClientRequestSpec spec) {
-        System.out.print("\nThinking... ");
-        System.out.flush();
-        AtomicBoolean firstContent = new AtomicBoolean(true);
+        new AttributedString("Thinking... ", AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE)).print(terminal);
+        terminal.writer().flush();
         AtomicBoolean thinkingPrinted = new AtomicBoolean(false);
+        AtomicBoolean thinkingOn = new AtomicBoolean(false);
+        AtomicBoolean aiOn = new AtomicBoolean(false);
         spec.stream()
             .chatResponse()
             .doOnNext(cr -> {
@@ -151,28 +192,29 @@ class ChatLoop implements CommandLineRunner {
                     if (thinking == null) thinking = (String) cr.getResult().getMetadata().get("reasoningContent");
                 } catch (Exception ignored) {}
                 if (thinking != null && !thinking.isBlank()) {
-                    if (thinkingPrinted.compareAndSet(false, true)) {
-                        System.out.print("\r");
+                    if (!thinkingOn.get()) {
+                        terminal.writer().print("\n");
+                        terminal.writer().flush();
+                        printColored(thinkingPrinted.compareAndSet(false, true) ? "[Thinking] " : "", THINKING_COLOR, false);
+                        thinkingOn.set(true);
                     }
-                    System.out.println("[Thinking] " + thinking);
-                    System.out.flush();
+                    printColored(thinking, THINKING_COLOR, false);
                 }
                 String content = null;
                 try { content = cr.getResult().getOutput().getText(); } catch (Exception ignored) {}
                 if (content != null && !content.isBlank()) {
-                    if (firstContent.getAndSet(false)) {
-                        if (!thinkingPrinted.get()) System.out.print("\r");
-                        System.out.print("AI: ");
+                    if (!aiOn.get()) {
+                        terminal.writer().print(thinkingPrinted.get() ? "\n\n" : "\n");
+                        terminal.writer().flush();
+                        printColored("AI: ", AI_COLOR, true);
+                        aiOn.set(true);
                     }
-                    System.out.print(content);
-                    System.out.flush();
+                    printColored(content, AI_COLOR, true);
                 }
             })
             .blockLast();
-        if (firstContent.get() && !thinkingPrinted.get()) {
-            System.out.print("\r");
-        }
-        System.out.println("\n");
+        terminal.writer().print("\n\n");
+        terminal.writer().flush();
     }
 
     /** BLUEPRINT Step 8: vision via Media attachment on the user message. */
@@ -183,7 +225,7 @@ class ChatLoop implements CommandLineRunner {
                                   AtomicReference<Double> temperature) {
         ImageQuery query = parseImageArgs(input);
         if (query == null || mimeFor(query.path()) == null) {
-            System.out.println("Usage: /image <path-to-image> <question>   (png/jpg/jpeg/gif/webp)\n");
+            terminal.writer().println("Usage: /image <path-to-image> <question>   (png/jpg/jpeg/gif/webp)\n");
             return;
         }
         try {
@@ -194,16 +236,16 @@ class ChatLoop implements CommandLineRunner {
                     .data(new FileSystemResource(query.path()))
                     .build())
                 .build();
-            System.out.println("\n[Vision] inspecting " + query.path() + "...");
+            terminal.writer().println("\n[Vision] inspecting " + query.path() + "...");
             streamAndPrint(buildSpec(message, conversationId, role, modelOverride, temperature));
         } catch (Exception e) {
             String msg = String.valueOf(e.getMessage());
-            System.out.println("[Error] " + msg);
+            terminal.writer().println("[Error] " + msg);
             // e.g. Ollama MLX builds reject vision: {"error":"this model does not support image input"}
             if (msg.contains("does not support image")) {
-                System.out.println("Hint: switch to a vision-capable model first, e.g. /model minicpm-v4.6\n");
+                terminal.writer().println("Hint: switch to a vision-capable model first, e.g. /model minicpm-v4.6\n");
             } else {
-                System.out.println();
+                terminal.writer().println();
             }
         }
     }
@@ -212,7 +254,7 @@ class ChatLoop implements CommandLineRunner {
     private void handleConvert(String input, String conversationId, AtomicReference<String> modelOverride) {
         String[] args = parseConvertArgs(input);
         if (args == null) {
-            System.out.println("Usage: /convert <value> <from-unit> <to-unit>   e.g. /convert 100 km miles\n");
+            terminal.writer().println("Usage: /convert <value> <from-unit> <to-unit>   e.g. /convert 100 km miles\n");
             return;
         }
         BeanOutputConverter<UnitConversion> converter = new BeanOutputConverter<>(UnitConversion.class);
@@ -234,10 +276,10 @@ class ChatLoop implements CommandLineRunner {
                 .content();
 
             UnitConversion conversion = converter.convert(json);
-            System.out.println(converter.getJsonSchema());
-            System.out.printf("Converted: %s %s = %.2f %s%n%n", args[0], args[1], conversion.value(), conversion.unit());
+            terminal.writer().println(converter.getJsonSchema());
+            terminal.writer().printf("Converted: %s %s = %.2f %s%n%n", args[0], args[1], conversion.value(), conversion.unit());
         } catch (Exception e) {
-            System.out.println("[Error] structured output failed: " + e.getMessage() + "\n");
+            terminal.writer().println("[Error] structured output failed: " + e.getMessage() + "\n");
         }
     }
 

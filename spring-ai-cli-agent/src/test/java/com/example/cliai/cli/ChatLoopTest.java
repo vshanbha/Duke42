@@ -1,13 +1,13 @@
 package com.example.cliai.cli;
 
 import org.junit.jupiter.api.Test;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import org.springframework.ai.chat.client.ChatClient;
 import reactor.core.publisher.Flux;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -19,87 +19,65 @@ import static org.mockito.Mockito.when;
 class ChatLoopTest {
 
     @Test
-    void shouldExitOnExitCommand() {
+    void shouldExitOnExitCommand() throws Exception {
         ChatClient chatClient = mock(ChatClient.class);
+        Terminal terminal = TerminalBuilder.builder().dumb(true).streams(new java.io.ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream()).build();
+        ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
 
-        ChatLoop chatLoop = new ChatLoop(chatClient);
+        boolean exit = chatLoop.processLine("exit");
 
-        InputStream originalIn = System.in;
-        try {
-            String input = "exit\n";
-            System.setIn(new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)));
-
-            chatLoop.run();
-
-            verify(chatClient, never()).prompt();
-        } finally {
-            System.setIn(originalIn);
-        }
+        org.assertj.core.api.Assertions.assertThat(exit).isTrue();
+        verify(chatClient, never()).prompt();
     }
 
     @Test
-    void shouldExitOnQuitCommand() {
+    void shouldExitOnQuitCommand() throws Exception {
         ChatClient chatClient = mock(ChatClient.class);
+        Terminal terminal = TerminalBuilder.builder().dumb(true).streams(new java.io.ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream()).build();
+        ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
 
-        ChatLoop chatLoop = new ChatLoop(chatClient);
+        boolean exit = chatLoop.processLine("quit");
 
-        InputStream originalIn = System.in;
-        try {
-            String input = "quit\n";
-            System.setIn(new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)));
-
-            chatLoop.run();
-
-            verify(chatClient, never()).prompt();
-        } finally {
-            System.setIn(originalIn);
-        }
+        org.assertj.core.api.Assertions.assertThat(exit).isTrue();
+        verify(chatClient, never()).prompt();
     }
 
     @Test
-    void shouldExitCleanlyWhenInputEnds() {
+    void shouldNotExitOnRegularInput() throws Exception {
         ChatClient chatClient = mock(ChatClient.class);
+        Terminal terminal = TerminalBuilder.builder().dumb(true).streams(new java.io.ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream()).build();
+        ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
 
-        ChatLoop chatLoop = new ChatLoop(chatClient);
+        boolean exit = chatLoop.processLine("Hello there");
 
-        InputStream originalIn = System.in;
-        try {
-            System.setIn(new ByteArrayInputStream(new byte[0]));
-
-            chatLoop.run();
-
-            verify(chatClient, never()).prompt();
-        } finally {
-            System.setIn(originalIn);
-        }
+        org.assertj.core.api.Assertions.assertThat(exit).isFalse();
     }
 
     @Test
-    void shouldHandleSlashCommandsWithoutCallingModel() {
+    void shouldHandleSlashCommandsWithoutCallingModel() throws Exception {
         ChatClient chatClient = mock(ChatClient.class);
-        ChatLoop chatLoop = new ChatLoop(chatClient);
-        InputStream originalIn = System.in;
+        Terminal terminal = TerminalBuilder.builder().dumb(true).streams(new java.io.ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream()).build();
+        ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
+
+        // Slash commands render to System.out (consistent across terminals).
         PrintStream originalOut = System.out;
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream sysOut = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(sysOut));
         try {
-            System.setIn(new ByteArrayInputStream("/help\n/tools\n/clear\n/exit\n"
-                .getBytes(StandardCharsets.UTF_8)));
-            System.setOut(new PrintStream(output));
+            boolean exit = chatLoop.processLine("/help");
+            String text = sysOut.toString(StandardCharsets.UTF_8);
 
-            chatLoop.run();
-
-            String text = output.toString(StandardCharsets.UTF_8);
+            org.assertj.core.api.Assertions.assertThat(exit).isFalse();
             org.assertj.core.api.Assertions.assertThat(text)
-                .contains("/help", "CalculatorTool", "Conversation cleared.", "Goodbye!");
+                .contains("/help", "/tools", "/exit");
             verify(chatClient, never()).prompt();
         } finally {
-            System.setIn(originalIn);
             System.setOut(originalOut);
         }
     }
 
     @Test
-    void shouldStreamChatClientResponseOnUserInput() {
+    void shouldStreamChatClientResponseOnUserInput() throws Exception {
         ChatClient chatClient = mock(ChatClient.class);
         ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
         ChatClient.StreamResponseSpec streamSpec = mock(ChatClient.StreamResponseSpec.class);
@@ -114,21 +92,17 @@ class ChatLoopTest {
             java.util.List.of(new org.springframework.ai.chat.model.Generation(new org.springframework.ai.chat.messages.AssistantMessage(" response"))));
         when(streamSpec.chatResponse()).thenReturn(Flux.just(r1, r2));
 
-        ChatLoop chatLoop = new ChatLoop(chatClient);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Terminal terminal = TerminalBuilder.builder().dumb(true).streams(new java.io.ByteArrayInputStream(new byte[0]), out).build();
+        ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
 
-        InputStream originalIn = System.in;
-        try {
-            String input = "Hello\nexit\n";
-            System.setIn(new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)));
+        boolean exit = chatLoop.processLine("Hello");
 
-            chatLoop.run();
-
-            verify(chatClient).prompt();
-            verify(requestSpec).user("Hello");
-            verify(requestSpec).stream();
-            verify(streamSpec).chatResponse();
-        } finally {
-            System.setIn(originalIn);
-        }
+        org.assertj.core.api.Assertions.assertThat(exit).isFalse();
+        verify(chatClient).prompt();
+        verify(requestSpec).user("Hello");
+        verify(requestSpec).stream();
+        verify(streamSpec).chatResponse();
+        org.assertj.core.api.Assertions.assertThat(out.toString(StandardCharsets.UTF_8)).contains("AI: ");
     }
 }

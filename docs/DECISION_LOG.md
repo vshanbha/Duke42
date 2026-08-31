@@ -121,3 +121,51 @@ Decision:
 - `application-local.properties` is git-ignored (example only, not committed); it is now
   redundant with the default and left as a personal local file. `AGENTS.md` and the module
   `README.md` updated to reflect the new default.
+
+---
+
+## Decision 8 — Spring Shell REPL migration (CLI agent)
+
+Context: The CLI agent ran a hand-rolled `Scanner`-based REPL (`CommandLineRunner`) on
+top of `spring-boot-starter-web` (embedded Tomcat on port 8081). The terminal output used
+raw `\u001B` ANSI escape literals for thinking/answer coloring. The user asked to replace
+the REPL with Spring Shell and fix the Tomcat `AsynchronousCloseException` on exit.
+
+Findings:
+
+- **Spring Shell 4.0.3** (latest as of 2026-08) targets **Spring Boot 4.0.x** (specifically
+  4.0.7). There is no Shell 4.1.x release; the Shell compatibility matrix lists
+  Boot 4.0.x only. The project (and the backend module) are on **Boot 4.1.0**.
+- Forcing Shell's transitive Boot 4.0.7 up to 4.1.0 via direct `spring-boot-starter` /
+  `spring-boot-autoconfigure` dependencies proved **unnecessary** — Maven's
+  `dependencyManagement` from the Boot 4.1.0 parent already overrides the transitive
+  versions. Those force-deps were removed.
+- Shell 4.0.3's autoconfiguration had a `lineReader → commandCompleter →
+  commandRegistry → chatLoop → lineReader` circular dependency. This was resolved
+  by injecting only `Terminal` into `ChatLoop` and building the `LineReader` locally
+  inside the `chat()` command, which eliminates the cycle entirely. The
+  `spring.main.allow-circular-references=true` flag was therefore also removed.
+- The `@Command` annotation in Shell 4.0.3 defines `value()` as `@AliasFor("description")`,
+  so `value` and `description` must match; `help` is the separate short description.
+
+Decision:
+
+- **Keep Boot 4.1.0** (consistent with the backend module and Spring AI 2.0.0) and
+  **keep Shell 4.0.3** (latest available). The residual version skew (Shell 4.0.3
+  compiled against Boot 4.0.7, running on Boot 4.1.0 / Spring Framework 7.0.8) is
+  accepted as tracked tech debt.
+- **No hacks remain**: `spring.main.allow-circular-references=true` and the explicit
+  Boot force-deps were both removed; the build compiles and all 59 unit tests pass
+  without either.
+- The `@Command(value="chat", help="...")` pattern is used for the chat command;
+  `help` provides the description since `value` mirrors `description`.
+- Metrics are exposed over **JMX** (`spring.jmx.enabled=true`,
+  `management.endpoints.jmx.exposure.include=health,info,metrics`) instead of HTTP
+  `/actuator/metrics`, because the app runs as a non-web Spring Shell application
+  (`spring.main.web-application-type=none`). The BLUEPRINT and docs have been updated
+  to reflect this.
+
+Upgrade path: Adopt Spring Shell 4.1.x when released (aligned with Boot 4.1.x) and
+remove the version-skew acceptance. Alternatively, downgrade Boot to 4.0.7 (Shell's
+true baseline) if a fully-clean pairing is desired — this would create monorepo skew
+with the backend module.

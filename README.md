@@ -79,7 +79,7 @@ cd duke42
 ```bash
 cd spring-ai-cli-agent
 mvn spring-boot:run
-# Runs on port 8081
+# Runs as a non-web Spring Shell app (no embedded server)
 ```
 
 **3. Run the Enterprise Backend**

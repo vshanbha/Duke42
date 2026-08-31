@@ -8,7 +8,7 @@
 
 > **✅ IMPLEMENTATION STATUS (2026-08-26):** All 15 steps implemented in `spring-ai-cli-agent` (+ backend RAG parity). Verified deviations from this document as written:
 > - **Step 10 retrieval**: Spring AI 2.0.0 ships `QuestionAnswerAdvisor` (`spring-ai-vector-store-advisor`), not a `VectorStoreSimilarityRetriever`; ETL = `TextReader` → `TokenTextSplitter` → `PgVectorStore.add`. RAG is property-gated (`rag.enabled=true`) like MCP.
-> - **Step 14**: There is no `ObservationAdvisor` class in Spring AI 2.0.0 – ChatModel observation is native Micrometer; `SimpleLoggerAdvisor` stays for trace and `/actuator/metrics/gen_ai.client.token.usage` provides metrics (CLI got web+actuator starters).
+> - **Step 14**: There is no `ObservationAdvisor` class in Spring AI 2.0.0 – ChatModel observation is native Micrometer; `SimpleLoggerAdvisor` stays for trace. The CLI runs as a **non-web** Spring Shell app (`spring.main.web-application-type=none`), so metrics are exposed over **JMX** (`spring.jmx.enabled=true`, `management.endpoints.jmx.exposure.include=health,info,metrics`), not HTTP `/actuator/metrics`. (The backend still serves HTTP actuator on 8080.)
 > - **Step 15 poms**: `spring-boot-starter-parent` does not manage Testcontainers versions – pinned via `testcontainers-ollama.version`; container tests are opt-in (`-Dtc.ollama=true`, `-Dtc.pgvector=true`) to keep default runs dependency-free.
 > - **docker-compose.yml** is a superset: backend + polyglot app services plus ollama + pgvector dev-time services.
 
@@ -93,7 +93,7 @@ Duke42/
 
 ```
 ┌──────────────────────────────────────────────────┐
-│         Backend (port 8080) + CLI (8081)          │
+│         Backend (port 8080) + CLI (non-web, Spring Shell)          │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
 │  │ Vaadin   │  │ REST/    │  │ MCP      │       │
 │  │  /chat   │  │ GraphQL  │  │ Client   │       │
@@ -123,7 +123,7 @@ Duke42/
 
 **What you'll build**: CLI loop `You: → AI:` via `ChatClient` (no memory/tools).
 
-**Key files**: `pom.xml` (`spring-ai-starter-model-ollama` via `spring-ai-bom:2.0.0`), `application.properties` (`spring.ai.ollama.base-url`, `spring.ai.ollama.chat.options.model=gemma4:e4b`), `Application.java`, `AgentConfiguration.java` (`ChatClient.builder(chatModel).build()`), `ChatLoop.java` (simple `Scanner` loop, later: `SlashCommandHandler`).
+**Key files**: `pom.xml` (`spring-ai-starter-model-ollama` via `spring-ai-bom:2.0.0`), `application.properties` (`spring.ai.ollama.base-url`, `spring.ai.ollama.chat.model=gemma4:e4b`), `Application.java`, `AgentConfiguration.java` (`ChatClient.builder(chatModel).build()`), `ChatLoop.java` (simple `Scanner` loop, later: `SlashCommandHandler`).
 
 **Verify**: `mvn spring-boot:run` → `What is 2+2?`
 
@@ -284,7 +284,10 @@ After all 15 steps, the project has:
         <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-pgvector-store</artifactId></dependency>
         <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-vector-store-advisor</artifactId></dependency>
         <dependency><groupId>org.springaicommunity</groupId><artifactId>spring-ai-agent-utils</artifactId><version>0.10.0</version></dependency>
-        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+        <!-- Spring Shell REPL (JLine) – non-web app, no Tomcat needed.
+             NOTE: Shell 4.0.3 targets Boot 4.0.x; see DECISION_LOG #8. -->
+        <dependency><groupId>org.springframework.shell</groupId><artifactId>spring-shell-starter</artifactId><version>4.0.3</version></dependency>
+        <dependency><groupId>org.springframework.shell</groupId><artifactId>spring-shell-jline</artifactId><version>4.0.3</version></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
         <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-spring-boot-testcontainers</artifactId><scope>test</scope></dependency>
@@ -300,15 +303,15 @@ After all 15 steps, the project has:
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=gemma4:e4b
+spring.ai.ollama.chat.model=gemma4:e4b-mlx
 spring.ai.ollama.chat.think=medium
 spring.ai.mcp.client.enabled=false
 spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000
-management.endpoints.web.exposure.include=health,info,metrics
+spring.jmx.enabled=true
+management.endpoints.jmx.exposure.include=health,info,metrics
 rag.enabled=false
 rag.datasource.url=jdbc:postgresql://localhost:5432/vector
 rag.vectorstore.dimensions=768
-server.port=8081
 ```
 
 ### `docker-compose.yml` (dev-time services)
