@@ -223,7 +223,7 @@ class ChatLoop {
                                   AtomicReference<Double> temperature) {
         ImageQuery query = parseImageArgs(input);
         if (query == null || mimeFor(query.path()) == null) {
-            System.out.println("Usage: /image <path-to-image> <question>   (png/jpg/jpeg/gif/webp)\n");
+            terminal.writer().println("Usage: /image <path-to-image> <question>   (png/jpg/jpeg/gif/webp)\n");
             return;
         }
         try {
@@ -234,16 +234,16 @@ class ChatLoop {
                     .data(new FileSystemResource(query.path()))
                     .build())
                 .build();
-            System.out.println("\n[Vision] inspecting " + query.path() + "...");
+            terminal.writer().println("\n[Vision] inspecting " + query.path() + "...");
             streamAndPrint(buildSpec(message, conversationId, role, modelOverride, temperature));
         } catch (Exception e) {
             String msg = String.valueOf(e.getMessage());
-            System.out.println("[Error] " + msg);
+            terminal.writer().println("[Error] " + msg);
             // e.g. Ollama MLX builds reject vision: {"error":"this model does not support image input"}
             if (msg.contains("does not support image")) {
-                System.out.println("Hint: switch to a vision-capable model first, e.g. /model minicpm-v4.6\n");
+                terminal.writer().println("Hint: switch to a vision-capable model first, e.g. /model minicpm-v4.6\n");
             } else {
-                System.out.println();
+                terminal.writer().println();
             }
         }
     }
@@ -252,7 +252,7 @@ class ChatLoop {
     private void handleConvert(String input, String conversationId, AtomicReference<String> modelOverride) {
         String[] args = parseConvertArgs(input);
         if (args == null) {
-            System.out.println("Usage: /convert <value> <from-unit> <to-unit>   e.g. /convert 100 km miles\n");
+            terminal.writer().println("Usage: /convert <value> <from-unit> <to-unit>   e.g. /convert 100 km miles\n");
             return;
         }
         BeanOutputConverter<UnitConversion> converter = new BeanOutputConverter<>(UnitConversion.class);
@@ -274,10 +274,10 @@ class ChatLoop {
                 .content();
 
             UnitConversion conversion = converter.convert(json);
-            System.out.println(converter.getJsonSchema());
-            System.out.printf("Converted: %s %s = %.2f %s%n%n", args[0], args[1], conversion.value(), conversion.unit());
+            terminal.writer().println(converter.getJsonSchema());
+            terminal.writer().printf("Converted: %s %s = %.2f %s%n%n", args[0], args[1], conversion.value(), conversion.unit());
         } catch (Exception e) {
-            System.out.println("[Error] structured output failed: " + e.getMessage() + "\n");
+            terminal.writer().println("[Error] structured output failed: " + e.getMessage() + "\n");
         }
     }
 

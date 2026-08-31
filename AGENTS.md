@@ -9,7 +9,7 @@
 mvn clean install
 
 # Run specific modules
-cd spring-ai-cli-agent && mvn spring-boot:run  # CLI Agent (port 8081)
+cd spring-ai-cli-agent && mvn spring-boot:run  # CLI Agent (non-web)
 cd backend && mvn spring-boot:run               # Backend with Vaadin UI (port 8080)
 cd polyglot && java -jar target/polyglot-runner.jar  # Polyglot MCP server (port 9000)
 ```
@@ -30,7 +30,7 @@ From module:
 # CLI Agent: 64 tests (59 run + 3 evals skipped without -Devals=true + Ollama,
 # plus 2 Docker-gated opt-ins: -Dtc.ollama=true, -Dtc.pgvector=true)
 cd spring-ai-cli-agent && mvn test
-# opt-in evals with Ollama gemma4:e4b-mlx (local default) or gemma4:e4b (CI via -Dspring.ai.ollama.chat.options.model)
+# opt-in evals with Ollama gemma4:e4b-mlx (local default) or gemma4:e4b (CI via -Dspring.ai.ollama.chat.model)
 cd spring-ai-cli-agent && mvn test -Devals=true
 
 # Backend: unit + GraphQL tests only (14 tests; no Ollama required)
@@ -45,7 +45,7 @@ cd backend && mvn test -Dmcp.integration=true # or mvn test -Dmcp.integration=tr
 
 | Module | Purpose | Port | Tests |
 |--------|---------|------|-------|
-| `spring-ai-cli-agent/` | CLI Agent learning project | 8081 | 64 (3 evals + 2 Docker-gated opt-in) |
+| `spring-ai-cli-agent/` | CLI Agent learning project | non-web | 64 (3 evals + 2 Docker-gated opt-in) |
 | `backend/` | Enterprise demo (Vaadin + REST + GraphQL + MCP) | 8080 | 14 (10 unit + 4 e2e via failsafe) |
 | `polyglot/` | GraalVM Python integration (MCP server) | 9000 | 3 (integration) |
 | `ui/` | Legacy JavaFX desktop client (optional, not in parent build) | — | — |
@@ -72,7 +72,7 @@ cd backend && mvn test -Dmcp.integration=true # or mvn test -Dmcp.integration=tr
 - Backend unit tests use `@SpringBootTest` with Mockito
 - Backend e2e tests start jar as real process, test with Java HTTP client
 - Each test generates unique `chatId` (UUID) for isolation
-- Tests expect Ollama running locally with `gemma4:e4b-mlx` (default; already on the maintainer's Mac) or `gemma4:e4b` on CI/Linux (`ollama pull gemma4:e4b`, pinned via `-Dspring.ai.ollama.chat.options.model=gemma4:e4b`)
+- Tests expect Ollama running locally with `gemma4:e4b-mlx` (default; already on the maintainer's Mac) or `gemma4:e4b` on CI/Linux (`ollama pull gemma4:e4b`, pinned via `-Dspring.ai.ollama.chat.model=gemma4:e4b`)
 - Spring AI CLI Agent tests use JUnit 5 + AssertJ + Mockito (no Ollama required); evals need Ollama (`-Devals=true`)
 
 ## Environment Requirements
@@ -87,7 +87,7 @@ cd backend && mvn test -Dmcp.integration=true # or mvn test -Dmcp.integration=tr
 1. **Forgetting Ollama**: Backend tests will fail if Ollama isn't running
 2. **MCP config disabled**: Integration tests with MCP tools won't work unless config is enabled
 3. **Polyglot build order**: Build polyglot module before running backend with MCP
-4. **Port conflicts**: CLI agent runs on 8081, backend on 8080
+4. **Port conflicts**: CLI agent runs as a non-web Spring Shell app; backend on 8080
 5. **Module isolation**: Each module has its own `pom.xml` - run commands from module directory
 6. **Vaadin frontend**: Requires Node.js for dev mode; use `vaadin.productionMode=true` for tests
 7. **Vaadin fat jar needs production mode**: `vaadin-dev` is `<optional>` and excluded from the packaged jar. Running the jar with `vaadin.productionMode=false` (the yaml default, meant for `mvn spring-boot:run`) fails with `'vaadin-dev-server' not found`. Always start the jar with `--vaadin.productionMode=true` — E2EIT does this for you

@@ -14,7 +14,7 @@ Chat with a local LLM (Ollama) from your terminal. The agent has:
 
 ```bash
 # Prerequisites: Java 17+, Maven, Ollama with gemma4:e4b-mlx (default, Mac MLX, already downloaded) or gemma4:e4b (Linux/CI)
-ollama pull gemma4:e4b-mlx # default; CI uses gemma4:e4b via -Dspring.ai.ollama.chat.options.model=gemma4:e4b
+ollama pull gemma4:e4b-mlx # default; CI uses gemma4:e4b via -Dspring.ai.ollama.chat.model=gemma4:e4b
 # Native Ollama thinking: spring.ai.ollama.chat.think=medium in application.properties
 
 # Run (default model is gemma4:e4b-mlx; CI overrides to gemma4:e4b via -D)
@@ -69,7 +69,7 @@ From `spring-ai-cli-agent/`:
 
 ```bash
 mvn test # 64 tests, 3 evals skipped without Ollama + 2 Docker-gated opt-ins
-mvn test -Devals=true # opt-in model/tool-call evals, requires Ollama gemma4:e4b-mlx (or gemma4:e4b via -Dspring.ai.ollama.chat.options.model=gemma4:e4b)
+mvn test -Devals=true # opt-in model/tool-call evals, requires Ollama gemma4:e4b-mlx (or gemma4:e4b via -Dspring.ai.ollama.chat.model=gemma4:e4b)
 ```
 
 All tests pass with general setup – no need to specify `-Dtest=...`. Evals exit `0` when model invokes expected tool (checked via `[Tool]` trace), non-zero when Ollama unavailable.
@@ -80,12 +80,12 @@ Edit `src/main/resources/application.properties` (checked-in default: `gemma4:e4
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.options.model=gemma4:e4b-mlx  # default Mac MLX (8.8 GB); CI pins gemma4:e4b (9.6 GB) via -Dspring.ai.ollama.chat.options.model=gemma4:e4b
+spring.ai.ollama.chat.model=gemma4:e4b-mlx  # default Mac MLX (8.8 GB); CI pins gemma4:e4b (9.6 GB) via -Dspring.ai.ollama.chat.model=gemma4:e4b
 # Full <10 GB tools-capable comparison: see ../ollama-model-links.md (single source of truth)
 ```
 
-CI override – the GitHub workflow runs `mvn test -Dspring.ai.ollama.chat.options.model=gemma4:e4b` on Linux.
-Or one-off: `mvn spring-boot:run -Dspring-boot.run.arguments=--spring.ai.ollama.chat.options.model=gemma4:e4b` # CI/Linux parity override
+CI override – the GitHub workflow runs `mvn test -Dspring.ai.ollama.chat.model=gemma4:e4b` on Linux.
+Or one-off: `mvn spring-boot:run -Dspring-boot.run.arguments=--spring.ai.ollama.chat.model=gemma4:e4b` # CI/Linux parity override
 
 ## How It Works
 

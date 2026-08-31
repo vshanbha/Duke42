@@ -46,7 +46,7 @@ jobs:
       run: cd spring-ai-cli-agent && mvn clean compile -q
 
     - name: Test CLI Agent
-      run: cd spring-ai-cli-agent && mvn test -q -Dspring.ai.ollama.chat.options.model=gemma4:e4b
+      run: cd spring-ai-cli-agent && mvn test -q -Dspring.ai.ollama.chat.model=gemma4:e4b
 
     - name: Test CLI Agent RAG wiring against pgvector (Docker-gated)
       run: cd spring-ai-cli-agent && mvn test -Dtest=RagConfigurationTest -Dtc.pgvector=true -q

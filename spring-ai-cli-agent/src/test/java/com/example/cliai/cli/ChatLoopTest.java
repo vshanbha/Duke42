@@ -62,10 +62,9 @@ class ChatLoopTest {
     void shouldHandleSlashCommandsWithoutCallingModel() throws Exception {
         ChatClient chatClient = mock(ChatClient.class);
         Terminal terminal = TerminalBuilder.builder().dumb(true).streams(new java.io.ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream()).build();
-        LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
         ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
 
-        // Slash commands render to System.out (like the handler unit tests).
+        // Slash commands render to System.out (consistent across terminals).
         PrintStream originalOut = System.out;
         ByteArrayOutputStream sysOut = new ByteArrayOutputStream();
         System.setOut(new PrintStream(sysOut));

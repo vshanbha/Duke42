@@ -65,27 +65,20 @@
              ANSI colouring – replaces the hand-rolled Scanner loop and raw escapes.
              Runs as a non-web application (spring.main.web-application-type=none) so no
              embedded server is started (clean exit, no Tomcat AsynchronousCloseException).
-             Shell 4.0.3 is built against Spring Boot 4.0.x; we override the Boot
-             baseline to 4.1.0 via the direct dependencies below. -->
+             NOTE: Spring Shell 4.0.3 (latest as of 2026-08) targets Spring Boot 4.0.x;
+             this module stays on Boot 4.1.0 for monorepo consistency with the backend.
+             See docs/DECISION_LOG.md #9. -->
         <dependency>
             <groupId>org.springframework.shell</groupId>
             <artifactId>spring-shell-starter</artifactId>
             <version>4.0.3</version>
         </dependency>
-        <!-- JLine terminal/line-reader + ANSI support (transitive resolution was unreliable). -->
+        <!-- JLine terminal/line-reader + ANSI support (needed explicitly; transitive
+             resolution via the starter was unreliable). -->
         <dependency>
             <groupId>org.springframework.shell</groupId>
             <artifactId>spring-shell-jline</artifactId>
             <version>4.0.3</version>
-        </dependency>
-        <!-- Force the Shell 4.0.3 transitive Boot 4.0.7 up to our 4.1.0 baseline. -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>
         <!-- Observability (BLUEPRINT Step 14): ChatModel calls are observed automatically
              via Micrometer (gen_ai.client.token.usage etc.). Exposed over JMX since the
