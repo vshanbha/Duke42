@@ -5,7 +5,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.example.cliai.agent.SystemPrompts;
-import com.example.cliai.agent.tools.UnitConversion;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
@@ -257,10 +256,10 @@ class ChatLoop {
             terminal.writer().println("Usage: /convert <value> <from-unit> <to-unit>   e.g. /convert 100 km miles\n");
             return;
         }
+        record UnitConversion(double value, String unit) {}
         BeanOutputConverter<UnitConversion> converter = new BeanOutputConverter<>(UnitConversion.class);
         try {
             OllamaChatOptions.Builder options = OllamaChatOptions.builder()
-                // JSON Schema derived from the UnitConversion record; deterministic answer → no thinking
                 .outputSchema(converter.getJsonSchema())
                 .disableThinking()
                 .temperature(0.1);

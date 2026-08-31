@@ -44,8 +44,9 @@ spring-ai-cli-agent/
 │   │   ├── AgentConfiguration.java   # ChatClient + tools + memory
 │   │   ├── UserVisibleToolCallback.java # pure trace embellishment
 │   │   └── tools/
-│   │       ├── CalculatorTool.java    # Math evaluator (SpEL)
-│   │       └── UnitConverterTool.java # Unit conversions
+│   │       ├── FileSystemTools.java    # Read/write/edit files (sandboxed)
+│   │       ├── GlobTool.java           # Find files by glob pattern
+│   │       └── GrepTool.java           # Search file contents by regex
 │   └── cli/
 │       ├── ChatLoop.java             # Terminal REPL
 │       ├── SlashCommand.java         # command pattern interface
@@ -53,7 +54,7 @@ spring-ai-cli-agent/
 ├── src/main/resources/
 │   ├── application.properties         # Ollama config (checked-in default: gemma4:e4b-mlx)
 │   └── application-local.properties   # local Mac MLX override (git-ignored; not committed, example only)
-└── src/test/java/                    # 64 tests (59 run + 3 evals skipped + 2 Docker-gated opt-ins)
+└── src/test/java/                    # 49 tests (44 run + 3 evals skipped + 2 Docker-gated opt-ins)
 ```
 
 ## Run Tests

@@ -1,7 +1,8 @@
 package com.example.cliai.agent;
 
-import com.example.cliai.agent.tools.CalculatorTool;
-import com.example.cliai.agent.tools.UnitConverterTool;
+import org.springaicommunity.agent.tools.FileSystemTools;
+import org.springaicommunity.agent.tools.GlobTool;
+import org.springaicommunity.agent.tools.GrepTool;
 import org.springaicommunity.agent.tools.AskUserQuestionTool;
 import org.springaicommunity.agent.utils.CommandLineQuestionHandler;
 import org.springframework.ai.chat.client.ChatClient;
@@ -37,8 +38,12 @@ class AgentConfiguration {
             .build();
 
         // Visibility embellishment for all tools (including QnA) – pure trace, no definition mutation or spec decoration
+        FileSystemTools fileSystemTools = FileSystemTools.builder()
+            .allowedDirectory(java.nio.file.Path.of(".")).build();
+        GlobTool globTool = GlobTool.builder().build();
+        GrepTool grepTool = GrepTool.builder().build();
         ToolCallback[] allWithTrace = java.util.Arrays.stream(
-                ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
+                ToolCallbacks.from(askUserQuestionTool, fileSystemTools, globTool, grepTool))
             .map(UserVisibleToolCallback::new)
             .toArray(ToolCallback[]::new);
 

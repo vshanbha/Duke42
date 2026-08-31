@@ -92,9 +92,10 @@ final class SlashCommandHandler {
         @Override public boolean supports(String input) { return "/tools".equalsIgnoreCase(input.trim()); }
         @Override public Result execute(String input, Context context) {
             System.out.println("\nAvailable tools:");
-            System.out.println("  CalculatorTool      Evaluate mathematical expressions");
-            System.out.println("  UnitConverterTool   Convert supported units");
-            System.out.println("  AskUserQuestionTool Let the agent ask a clarifying question\n");
+			System.out.println("  FileSystemTools    Read, write, and edit files (project-sandboxed)");
+			System.out.println("  GlobTool           Find files by glob pattern");
+			System.out.println("  GrepTool           Search file contents by regex");
+			System.out.println("  AskUserQuestionTool Let the agent ask a clarifying question\n");
             return Result.HANDLED;
         }
     }
