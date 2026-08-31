@@ -38,10 +38,11 @@ class AgentConfiguration {
             .build();
 
         // Visibility embellishment for all tools (including QnA) – pure trace, no definition mutation or spec decoration
+        java.nio.file.Path projectRoot = java.nio.file.Path.of(".").toAbsolutePath().normalize();
         FileSystemTools fileSystemTools = FileSystemTools.builder()
-            .allowedDirectory(java.nio.file.Path.of(".")).build();
-        GlobTool globTool = GlobTool.builder().build();
-        GrepTool grepTool = GrepTool.builder().build();
+            .allowedDirectory(projectRoot).build();
+        GlobTool globTool = GlobTool.builder().workingDirectory(projectRoot).build();
+        GrepTool grepTool = GrepTool.builder().workingDirectory(projectRoot).build();
         ToolCallback[] allWithTrace = java.util.Arrays.stream(
                 ToolCallbacks.from(askUserQuestionTool, fileSystemTools, globTool, grepTool))
             .map(UserVisibleToolCallback::new)

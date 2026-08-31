@@ -4,6 +4,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import com.example.cliai.agent.SystemPrompts;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
@@ -256,7 +258,7 @@ class ChatLoop {
             terminal.writer().println("Usage: /convert <value> <from-unit> <to-unit>   e.g. /convert 100 km miles\n");
             return;
         }
-        record UnitConversion(double value, String unit) {}
+        record UnitConversion(@JsonProperty(required = true) double value, @JsonProperty(required = true) String unit) {}
         BeanOutputConverter<UnitConversion> converter = new BeanOutputConverter<>(UnitConversion.class);
         try {
             OllamaChatOptions.Builder options = OllamaChatOptions.builder()

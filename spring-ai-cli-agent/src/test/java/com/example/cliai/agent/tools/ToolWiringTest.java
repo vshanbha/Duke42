@@ -14,17 +14,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ToolWiringTest {
 
     @Test
-    void shouldProduceCorrectToolCallbackCount() {
+    void shouldProduceToolCallbacksForAllThreeTools() {
         FileSystemTools fs = FileSystemTools.builder().allowedDirectory(Path.of(".")).build();
         GlobTool glob = GlobTool.builder().build();
         GrepTool grep = GrepTool.builder().build();
 
         ToolCallback[] callbacks = ToolCallbacks.from(fs, glob, grep);
+        // FileSystemTools exposes 3 @Tool methods (read/write/edit) + GlobTool (1) + GrepTool (1)
         assertThat(callbacks.length).isEqualTo(5);
     }
 
     @Test
-    void shouldWrapAllWithUserVisibleCallback() {
+    void shouldProduceValidToolDefinitions() {
         FileSystemTools fs = FileSystemTools.builder().allowedDirectory(Path.of(".")).build();
         GlobTool glob = GlobTool.builder().build();
         GrepTool grep = GrepTool.builder().build();
@@ -33,6 +34,7 @@ class ToolWiringTest {
         for (ToolCallback tc : callbacks) {
             assertThat(tc.getToolDefinition()).isNotNull();
             assertThat(tc.getToolDefinition().name()).isNotBlank();
+            assertThat(tc.getToolDefinition().description()).isNotBlank();
         }
     }
 }
