@@ -3,7 +3,7 @@
 One entry per governance-relevant decision, made before the change it governs.
 Referenced by `scripts/hooks/decision-log-gate.sh` for protected-path changes.
 
-## #1 — Adopt softwareaifactory.sh (2026-08-26)
+## Decision 1 — Adopt softwareaifactory.sh (2026-08-26)
 
 Installed the template at pinned ref v0.1.5 via the documented
 `install.sh init --pack java` flow. Rationale: AGENTS.md carried the factory's
@@ -14,7 +14,7 @@ Gates now live in `scripts/hooks/`, roles in `.opencode/agent/` (opencode canon;
 Model tiers left on `inherit`; reviewer-must-differ-model is enforced socially
 until a second provider is wired into `factory.yaml`.
 
-## #2 — Maven override of the java pack check_command; Gradle pack artifacts removed (2026-08-26)
+## Decision 2 — Maven override of the java pack check_command; Gradle pack artifacts removed (2026-08-26)
 
 The java pack assumes Gradle (`./gradlew spotlessCheck test`,
 `quality.gradle`, `.github/workflows/java-pack.yml`). Duke42 is a multi-module
@@ -29,7 +29,7 @@ Maven build with no wrapper. Decisions:
   wired as Maven plugins in the poms — shipping a red-on-arrival CI workflow is
   worse than deferring it. Revisit when pom quality plugins land.
 
-## #3 — Factory model tiers via the opencode zen catalog (2026-08-26)
+## Decision 3 — Factory model tiers via the opencode zen catalog (2026-08-26)
 
 Reviewer/spec-writer must run on a different model than the implementer
 (AGENTS.md Role-Based Development; reviewer.md's own header). With
@@ -54,7 +54,7 @@ Both IDs verified present in https://opencode.ai/zen/go/v1/models on
 No other file needs touching. `claude_*`/`codex_*` tiers stay blank on purpose:
 those harnesses are unused here and blank means "keep their own defaults".
 
-## #4 — Local override of spec-writer role: Ginkgo → JUnit 5 + AssertJ (2026-08-26)
+## Decision 4 — Local override of spec-writer role: Ginkgo → JUnit 5 + AssertJ (2026-08-26)
 
 The template's `spec-writer.md` is Go-specific ("Writes Ginkgo acceptance
 specs", "You write ONLY test files (*_test.go)"). Duke42 is Java: the blessed
@@ -69,7 +69,7 @@ Consequence: `.opencode/agent/spec-writer.md` now differs from upstream v0.1.5.
 wording rather than silently reverting to Ginkgo. Filed as an upstream note via
 the java-pack discussion (#66) since other Maven/Java adopters hit the same leak.
 
-## #5 — Branch protection intentionally OFF; local direct-push gate is the enforcement (2026-08-26)
+## Decision 5 — Branch protection intentionally OFF; local direct-push gate is the enforcement (2026-08-26)
 
 Duke42 has a single committer. GitHub-side branch protection on `main` is
 therefore deliberately not enabled: the `.githooks/pre-push`
@@ -79,7 +79,7 @@ that `git push --no-verify` from a configured clone bypasses it locally.
 Consequence for agents: do NOT re-suggest enabling branch protection while this
 decision stands. If the contributor count grows, revisit.
 
-## #6 — Agents never merge PRs; reviewer-agent pass mandatory; human merges (2026-08-26)
+## Decision 6 — Agents never merge PRs; reviewer-agent pass mandatory; human merges (2026-08-26)
 
 Origin: during factory adoption the agent executed `gh pr merge` for PRs #1–#5
 without the human asking per-merge. Green CI is not consent.
@@ -103,3 +103,21 @@ agent a GitHub credential scoped without `contents: write` on `main` (fine-grain
 PAT: `contents: read`, `pull_requests: write`, `actions: read` — then
 `gh pr merge` returns 403). Until one of those lands,
 compliance is detectable after the fact via `gh pr view --json mergedBy`.
+
+## Decision 7 — CLI Agent default Ollama model is gemma4:e4b-mlx; CI pins gemma4:e4b (2026-08-29)
+
+`mvn clean install` (and the `ChatClientIntegrationTest` `@SpringBootTest`) ran on the
+default profile and requested `gemma4:e4b`, which is not installed on the maintainer's
+Mac — only the MLX build `gemma4:e4b-mlx` is pulled locally, so the local build failed
+with `model 'gemma4:e4b' not found`.
+
+Decision:
+
+- Checked-in default `spring.ai.ollama.chat.options.model` becomes `gemma4:e4b-mlx`
+  (Mac MLX) in `spring-ai-cli-agent/src/main/resources/application.properties`, so a
+  plain `mvn clean install` works locally with no extra flags.
+- CI (`.github/workflows/ci.yml`, Linux) pins the cross-platform build with
+  `-Dspring.ai.ollama.chat.options.model=gemma4:e4b` (it already `ollama pull gemma4:e4b`).
+- `application-local.properties` is git-ignored (example only, not committed); it is now
+  redundant with the default and left as a personal local file. `AGENTS.md` and the module
+  `README.md` updated to reflect the new default.
