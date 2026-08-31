@@ -124,7 +124,7 @@ Decision:
 
 ---
 
-## Decision #9: Spring Shell REPL migration (CLI agent)
+## Decision 9 — Spring Shell REPL migration (CLI agent)
 
 Context: The CLI agent ran a hand-rolled `Scanner`-based REPL (`CommandLineRunner`) on
 top of `spring-boot-starter-web` (embedded Tomcat on port 8081). The terminal output used

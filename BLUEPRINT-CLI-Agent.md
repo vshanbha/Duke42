@@ -284,7 +284,10 @@ After all 15 steps, the project has:
         <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-pgvector-store</artifactId></dependency>
         <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-vector-store-advisor</artifactId></dependency>
         <dependency><groupId>org.springaicommunity</groupId><artifactId>spring-ai-agent-utils</artifactId><version>0.10.0</version></dependency>
-        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+        <!-- Spring Shell REPL (JLine) – non-web app, no Tomcat needed.
+             NOTE: Shell 4.0.3 targets Boot 4.0.x; see DECISION_LOG #9. -->
+        <dependency><groupId>org.springframework.shell</groupId><artifactId>spring-shell-starter</artifactId><version>4.0.3</version></dependency>
+        <dependency><groupId>org.springframework.shell</groupId><artifactId>spring-shell-jline</artifactId><version>4.0.3</version></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
         <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-spring-boot-testcontainers</artifactId><scope>test</scope></dependency>

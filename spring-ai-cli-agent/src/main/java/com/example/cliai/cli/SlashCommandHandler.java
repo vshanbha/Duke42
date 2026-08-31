@@ -6,6 +6,13 @@ import java.util.UUID;
 /**
  * Registry for all slash commands – single source of truth for name/description/dispatch.
  * Uses command pattern: each slash command is a {@link SlashCommand} object.
+ *
+ * <p>Output goes to {@code System.out} rather than the JLine {@code Terminal} writer because
+ * {@link org.jline.terminal.impl.DumbTerminal} does not bridge {@code terminal.writer()} to
+ * the provided {@code OutputStream} (verified: even with explicit {@code flush()}, output
+ * goes nowhere). {@code System.out} is the only reliable cross-terminal output path for
+ * short menu text; the chat streaming path ({@code ChatLoop.streamAndPrint}) uses
+ * {@code AttributedString.print(terminal)} which does work on real TTYs.
  */
 final class SlashCommandHandler {
 
