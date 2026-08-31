@@ -285,7 +285,7 @@ After all 15 steps, the project has:
         <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-vector-store-advisor</artifactId></dependency>
         <dependency><groupId>org.springaicommunity</groupId><artifactId>spring-ai-agent-utils</artifactId><version>0.10.0</version></dependency>
         <!-- Spring Shell REPL (JLine) – non-web app, no Tomcat needed.
-             NOTE: Shell 4.0.3 targets Boot 4.0.x; see DECISION_LOG #9. -->
+             NOTE: Shell 4.0.3 targets Boot 4.0.x; see DECISION_LOG #8. -->
         <dependency><groupId>org.springframework.shell</groupId><artifactId>spring-shell-starter</artifactId><version>4.0.3</version></dependency>
         <dependency><groupId>org.springframework.shell</groupId><artifactId>spring-shell-jline</artifactId><version>4.0.3</version></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
@@ -303,7 +303,7 @@ After all 15 steps, the project has:
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.model=gemma4:e4b
+spring.ai.ollama.chat.model=gemma4:e4b-mlx
 spring.ai.ollama.chat.think=medium
 spring.ai.mcp.client.enabled=false
 spring.ai.mcp.client.sse.connections.polyglot.url=http://localhost:9000

@@ -67,7 +67,7 @@
              embedded server is started (clean exit, no Tomcat AsynchronousCloseException).
              NOTE: Spring Shell 4.0.3 (latest as of 2026-08) targets Spring Boot 4.0.x;
              this module stays on Boot 4.1.0 for monorepo consistency with the backend.
-             See docs/DECISION_LOG.md #9. -->
+             See docs/DECISION_LOG.md #8. -->
         <dependency>
             <groupId>org.springframework.shell</groupId>
             <artifactId>spring-shell-starter</artifactId>
