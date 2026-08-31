@@ -1,8 +1,6 @@
 package com.example.cliai.cli;
 
 import org.junit.jupiter.api.Test;
-import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.springframework.ai.chat.client.ChatClient;
@@ -24,7 +22,6 @@ class ChatLoopTest {
     void shouldExitOnExitCommand() throws Exception {
         ChatClient chatClient = mock(ChatClient.class);
         Terminal terminal = TerminalBuilder.builder().dumb(true).streams(new java.io.ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream()).build();
-        LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
         ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
 
         boolean exit = chatLoop.processLine("exit");
@@ -37,7 +34,6 @@ class ChatLoopTest {
     void shouldExitOnQuitCommand() throws Exception {
         ChatClient chatClient = mock(ChatClient.class);
         Terminal terminal = TerminalBuilder.builder().dumb(true).streams(new java.io.ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream()).build();
-        LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
         ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
 
         boolean exit = chatLoop.processLine("quit");
@@ -50,7 +46,6 @@ class ChatLoopTest {
     void shouldNotExitOnRegularInput() throws Exception {
         ChatClient chatClient = mock(ChatClient.class);
         Terminal terminal = TerminalBuilder.builder().dumb(true).streams(new java.io.ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream()).build();
-        LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
         ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
 
         boolean exit = chatLoop.processLine("Hello there");
@@ -99,7 +94,6 @@ class ChatLoopTest {
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Terminal terminal = TerminalBuilder.builder().dumb(true).streams(new java.io.ByteArrayInputStream(new byte[0]), out).build();
-        LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
         ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
 
         boolean exit = chatLoop.processLine("Hello");
