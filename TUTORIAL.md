@@ -14,8 +14,8 @@ A CLI agent that:
 - Accepts user input from the terminal and responds via a local LLM
 - Remembers previous messages in the conversation
 - Asks clarifying questions when needed
-- Evaluates math expressions (calculator tool)
-- Converts units (km/miles, kg/lbs, etc.)
+- Reads/writes/edits files sandboxed to the project (FileSystemTools)
+- Finds files by glob pattern (GlobTool) and searches contents by regex (GrepTool)
 - Logs prompts and responses for debugging
 - Packages as a standalone executable jar
 
@@ -464,165 +464,125 @@ mvn test # top-level
 
 ---
 
-## Step 4: Custom Tool (Calculator)
+## Step 4: File System Tools (FileSystemTools)
 
-**Concept**: You can build your own tools by implementing a method annotated with `@Tool`. The `description` tells the AI *when* to use it. The `@ToolParam` annotations describe each parameter.
+**Concept**: The CLI agent ships with pre-built file system tools from `spring-ai-agent-utils`: `FileSystemTools` (read/write/edit), `GlobTool` (find files by pattern), and `GrepTool` (search file contents). These are sandboxed to the project directory for safety.
 
 ### 4.1 Dependencies
 
-No new dependencies – `SpEL` (`spring-expression`, already via `spring-boot-starter`) is used instead of removed `Nashorn`. `Tools` are discovered via `ToolCallbacks.from(new CalculatorTool())`.
+Already on classpath via `spring-ai-agent-utils:0.10.0` in `pom.xml`. No new dependencies needed.
 
 ### 4.2 Code Implementation
 
-#### 4.2.1 Create CalculatorTool
+#### 4.2.1 FileSystemTools (Read/Write/Edit)
 
-Create `src/main/java/com/example/cliai/agent/tools/CalculatorTool.java`:
+`FileSystemTools` provides three `@Tool`-annotated methods: `read`, `write`, and `edit`. It's configured with `allowedDirectory` to restrict file operations to the project root.
 
 ```java
-package com.example.cliai.agent.tools;
-
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.expression.ExpressionParser;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
-
-public class CalculatorTool {
-
-    private final ExpressionParser parser = new SpelExpressionParser();
-
-    @Tool(description = "Evaluate a mathematical expression. Supports +, -, *, /, parentheses. Example: (2 + 3) * 4")
-    double calculate(
-            @ToolParam(description = "The math expression to evaluate") String expression) {
-        try {
-            StandardEvaluationContext context = new StandardEvaluationContext();
-            context.setVariable("pi", Math.PI);
-            var result = parser.parseExpression(expression).getValue(context);
-            return result instanceof Number n ? n.doubleValue() : Double.parseDouble(result.toString());
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Cannot evaluate: " + expression, e);
-        }
-    }
-}
+// In AgentConfiguration.java
+java.nio.file.Path projectRoot = java.nio.file.Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+FileSystemTools fileSystemTools = FileSystemTools.builder()
+    .allowedDirectory(projectRoot)
+    .build();
 ```
 
-We use Spring Expression Language (SpEL) instead of `javax.script` because Java 17+ removed the Nashorn JavaScript engine.
+The `allowedDirectory` restriction enforces that the agent can only access files within the project directory. Attempting to read `/etc/passwd` returns `"Error: Access denied. Path is outside the allowed directories"`.
 
-#### 4.2.2 Register the Tool
+#### 4.2.2 Register FileSystemTools
 
 ```java
-.defaultTools(
-    AskUserQuestionTool.builder()
-        .questionHandler(new CommandLineQuestionHandler())
-        .build(),
-    new CalculatorTool()
-)
+ToolCallback[] allWithTrace = java.util.Arrays.stream(
+        ToolCallbacks.from(askUserQuestionTool, fileSystemTools, sandboxedGlob, sandboxedGrep))
+    .map(UserVisibleToolCallback::new)
+    .toArray(ToolCallback[]::new);
 ```
 
 ### 4.3 Verify
 
 ```bash
 mvn spring-boot:run
-# Type: What is (15 * 7) + 23?
-# AI should call the calculator tool and give you the answer
+# Type: Read the pom.xml file
+# AI should call FileSystemTools.read() and show you the content
+# Type: Write a file called hello.txt with "Hello, world!"
+# AI should call FileSystemTools.write() to create the file
 ```
 
 ### 4.4 Test Implementation
 
-* `src/test/java/com/example/cliai/agent/tools/CalculatorToolTest.java:12` – 12 tests (`shouldAddTwoNumbers`, `shouldHandleParentheses`, `shouldThrowOnInvalidExpression` etc., including `pi` via `context.setVariable("pi", Math.PI)`). Historically `Step 8.2`, now introduced here:
+* `src/test/java/com/example/cliai/agent/tools/FileSystemToolsTest.java:8` – 8 tests covering read, read with line range, write, edit, and sandbox security (reject outside directory, reject write outside, reject edit outside, reject traversal with `..`).
 
 ```bash
 mvn test # top-level Duke42/ or spring-ai-cli-agent/
-# 12 tests, SpEL `2 + 3` → `5.0`, `(2+3)*4` → `20.0`, `1/0` → `IllegalArgumentException`
+# 8 tests, including sandbox security verification
 ```
 
 ### 4.5 Further Reading
 
 * Spring AI `Tool Calling` – `@Tool(description="...")` as selection hint, `@ToolParam` per-param docs
-* Spring `SpEL` – `SpelExpressionParser`, `StandardEvaluationContext` vs removed `Nashorn`
+* `spring-ai-agent-utils` `FileSystemTools` – `allowedDirectory(Path)` sandbox enforcement
 
 ---
 
-## Step 5: Multiple Tools
+## Step 5: Multiple Tools (Glob + Grep)
 
-**Concept**: When multiple tools are registered, the AI picks the right one based on the user's request. It can even call multiple tools in sequence for complex questions.
+**Concept**: When multiple tools are registered, the AI picks the right one based on the user's request. `GlobTool` finds files by pattern, `GrepTool` searches file contents by regex.
 
 ### 5.1 Dependencies
 
-No new dependencies – second tool discovered via same `ToolCallbacks.from(new CalculatorTool(), new UnitConverterTool())` and `UserVisibleToolCallback` trace.
+Already on classpath via `spring-ai-agent-utils:0.10.0`.
 
 ### 5.2 Code Implementation
 
-#### 5.2.1 Create UnitConverterTool
+#### 5.2.1 Sandboxed GlobTool + GrepTool
 
-Create `src/main/java/com/example/cliai/agent/tools/UnitConverterTool.java`:
+`GlobTool` and `GrepTool` from the library accept arbitrary `path` arguments. We wrap them in `SandboxedGlobTool` and `SandboxedGrepTool` to enforce `allowedDirectory` restrictions.
 
 ```java
-package com.example.cliai.agent.tools;
-
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-
-public class UnitConverterTool {
-
-    @Tool(description = "Convert between units. Supports: km/miles, kg/lbs, celsius/fahrenheit, liters/gallons")
-    String convert(
-            @ToolParam(description = "The value to convert") double value,
-            @ToolParam(description = "Source unit (e.g., km, miles, kg, lbs, celsius, fahrenheit)") String from,
-            @ToolParam(description = "Target unit (e.g., km, miles, kg, lbs, celsius, fahrenheit)") String to) {
-
-        return switch (from.toLowerCase() + "->" + to.toLowerCase()) {
-            case "km->miles" -> value * 0.621371 + " miles";
-            case "miles->km" -> value * 1.60934 + " km";
-            case "kg->lbs" -> value * 2.20462 + " lbs";
-            case "lbs->kg" -> value / 2.20462 + " kg";
-            case "celsius->fahrenheit" -> (value * 9/5 + 32) + " °F";
-            case "fahrenheit->celsius" -> (value - 32) * 5/9 + " °C";
-            case "liters->gallons" -> value * 0.264172 + " gallons";
-            case "gallons->liters" -> value * 3.78541 + " liters";
-            default -> "Unsupported conversion: " + from + " to " + to;
-        };
-    }
-}
+// In AgentConfiguration.java
+GlobTool globTool = GlobTool.builder().workingDirectory(projectRoot).build();
+GrepTool grepTool = GrepTool.builder().workingDirectory(projectRoot).build();
+SandboxedGlobTool sandboxedGlob = new SandboxedGlobTool(globTool, projectRoot);
+SandboxedGrepTool sandboxedGrep = new SandboxedGrepTool(grepTool, projectRoot);
 ```
 
-#### 5.2.2 Register Both Tools
+The wrappers validate that the `path` argument is within `allowedDirectory` before delegating to the underlying tool.
+
+#### 5.2.2 Register All Tools
 
 ```java
-.defaultTools(
-    AskUserQuestionTool.builder()
-        .questionHandler(new CommandLineQuestionHandler())
-        .build(),
-    new CalculatorTool(),
-    new UnitConverterTool()
-)
+ToolCallback[] allWithTrace = java.util.Arrays.stream(
+        ToolCallbacks.from(askUserQuestionTool, fileSystemTools, sandboxedGlob, sandboxedGrep))
+    .map(UserVisibleToolCallback::new)
+    .toArray(ToolCallback[]::new);
 ```
 
 ### 5.3 Verify
 
 ```bash
 mvn spring-boot:run
-# Type: Convert 100 km to miles
-# AI calls UnitConverterTool
-# Type: What is 15 * 7?
-# AI calls CalculatorTool
-# Type: If I drive 100 km at 60 mph, how long does it take in minutes?
-# AI calls both tools in sequence
+# Type: Find all Java files in this project
+# AI should call GlobTool with pattern **/*.java
+# Type: Search for @Tool annotations in the codebase
+# AI should call GrepTool with pattern @Tool
+# Type: If I need to find all test files and then search for assertions in them, help me
+# AI should call both GlobTool and GrepTool in sequence
 ```
 
 ### 5.4 Test Implementation
 
-* `src/test/java/com/example/cliai/agent/tools/UnitConverterToolTest.java:12` – 12 tests (`shouldConvertKmToMiles` `100→62.1371`, `shouldConvertCelsiusToFahrenheit`, `shouldHandleCaseInsensitiveUnits` etc.):
+* `src/test/java/com/example/cliai/agent/tools/GlobToolTest.java:2` – 2 tests (glob pattern matching, empty results)
+* `src/test/java/com/example/cliai/agent/tools/GrepToolTest.java:2` – 2 tests (regex search, empty results)
+* `src/test/java/com/example/cliai/agent/tools/ToolWiringTest.java:2` – 2 tests (correct callback count, valid definitions)
 
 ```bash
 mvn test # top-level
-# 12 tests, `convert(100,"km","miles")` → `62.1371 miles`, unsupported → `Unsupported conversion`
+# 6 tests for glob/grep tools, including sandbox wrappers
 ```
 
 ### 5.5 Further Reading
 
 * Spring AI `Tool Calling` – multiple `ToolCallbacks`, AI tool selection via `description`
-* `ToolCallingEvalTest.java:32` `calculatorPromptMustExecuteCalculatorTool` – `trace.contains("[Tool] calculate","[Tool result] 128.0")` with real `gemma4:e4b-mlx`
+* `ToolCallingEvalTest.java:32` `globPromptMustExecuteGlobTool` – `trace.contains("[Tool] Glob","[Tool result]")` with real `gemma4:e4b-mlx`
 
 ---
 
@@ -694,7 +654,7 @@ The jar includes all dependencies and the Spring Boot loader. Anyone with Java 1
 
 ### 7.3 Test Implementation
 
-No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`64 tests` with `gemma4:e4b-mlx`).
+No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`58 tests` with `gemma4:e4b-mlx`).
 
 ### 7.4 Further Reading
 
@@ -705,7 +665,7 @@ No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipT
 
 ## Step 8: Full Test Suite (Tests Were Introduced Per Chapter)
 
-**Concept**: Testing was introduced at `Step 3.4` (`spring-boot-starter-test`) and each chapter added its own tests (`CalculatorToolTest` in `4.4`, `UnitConverterToolTest` in `5.4`, `AgentConfigurationTest`/`UserVisibleToolCallbackTest`/`CommandLineQuestionHandlerTest` in `3.4`). This step aggregates them – no new concept, just verification.
+**Concept**: Testing was introduced at `Step 3.4` (`spring-boot-starter-test`) and each chapter added its own tests (`FileSystemToolsTest` in `4.4`, `GlobToolTest`/`GrepToolTest` in `5.4`, `AgentConfigurationTest`/`UserVisibleToolCallbackTest`/`CommandLineQuestionHandlerTest` in `3.4`). This step aggregates them – no new concept, just verification.
 
 ### 8.1 Dependencies
 
@@ -721,185 +681,164 @@ Add to `pom.xml`:
 </dependency>
 ```
 
-### 8.2 CalculatorToolTest
+### 8.2 FileSystemToolsTest
 
-Create `src/test/java/com/example/cliai/agent/tools/CalculatorToolTest.java`:
+Create `src/test/java/com/example/cliai/agent/tools/FileSystemToolsTest.java`:
 
 ```java
 package com.example.cliai.agent.tools;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springaicommunity.agent.tools.FileSystemTools;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class CalculatorToolTest {
+class FileSystemToolsTest {
 
-    private CalculatorTool calculator;
+    private FileSystemTools fsTools;
+    @TempDir Path tempDir;
 
     @BeforeEach
     void setUp() {
-        calculator = new CalculatorTool();
+        fsTools = FileSystemTools.builder().allowedDirectory(tempDir).build();
     }
 
     @Test
-    void shouldAddTwoNumbers() {
-        assertThat(calculator.calculate("2 + 3")).isEqualTo(5.0);
+    void shouldReadProjectFile() throws IOException {
+        Path file = tempDir.resolve("dummy.txt");
+        Files.writeString(file, "<project></project>");
+        String content = fsTools.read(file.toString(), 1, 5);
+        assertThat(content).contains("<project>");
     }
 
     @Test
-    void shouldSubtractTwoNumbers() {
-        assertThat(calculator.calculate("10 - 4")).isEqualTo(6.0);
+    void shouldReadWithLineRange() throws IOException {
+        Path file = tempDir.resolve("lines.txt");
+        Files.writeString(file, "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6");
+        String content = fsTools.read(file.toString(), 3, 3);
+        assertThat(content).contains("Line 3");
     }
 
     @Test
-    void shouldMultiplyTwoNumbers() {
-        assertThat(calculator.calculate("6 * 7")).isEqualTo(42.0);
+    void shouldWriteAndReadBack() throws IOException {
+        Path file = tempDir.resolve("new_file.txt");
+        fsTools.write(file.toString(), "Hello, world!");
+        String content = fsTools.read(file.toString(), 1, 100);
+        assertThat(content).contains("Hello, world!");
     }
 
     @Test
-    void shouldDivideTwoNumbers() {
-        assertThat(calculator.calculate("15 / 3")).isEqualTo(5.0);
+    void shouldEditFileContent() throws IOException {
+        Path file = tempDir.resolve("config.xml");
+        Files.writeString(file, "<config><setting>old_value</setting></config>");
+        fsTools.edit(file.toString(), "old_value", "new_value", false);
+        String content = fsTools.read(file.toString(), 1, 100);
+        assertThat(content).contains("new_value");
     }
 
     @Test
-    void shouldHandleParentheses() {
-        assertThat(calculator.calculate("(2 + 3) * 4")).isEqualTo(20.0);
+    void shouldRejectOutsideAllowedDirectory() {
+        assertThat(fsTools.read("/etc/passwd", 1, 1)).contains("Access denied");
     }
 
     @Test
-    void shouldHandleNestedParentheses() {
-        assertThat(calculator.calculate("((1 + 2) * (3 + 4))")).isEqualTo(21.0);
+    void shouldRejectWriteOutsideAllowedDirectory() {
+        assertThat(fsTools.write("/etc/passwd", "evil")).contains("Access denied");
     }
 
     @Test
-    void shouldHandleComplexExpression() {
-        assertThat(calculator.calculate("(15 * 7) + 23")).isEqualTo(128.0);
+    void shouldRejectEditOutsideAllowedDirectory() {
+        assertThat(fsTools.edit("/etc/passwd", "root", "hacker", false)).contains("Access denied");
     }
 
     @Test
-    void shouldReturnDecimalResult() {
-        assertThat(calculator.calculate("10.0 / 3"))
-            .isCloseTo(3.333, org.assertj.core.data.Offset.offset(0.001));
-    }
-
-    @Test
-    void shouldHandleSingleNumber() {
-        assertThat(calculator.calculate("42")).isEqualTo(42.0);
-    }
-
-    @Test
-    void shouldThrowOnDivisionByZero() {
-        assertThatThrownBy(() -> calculator.calculate("1 / 0"))
-            .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void shouldThrowOnInvalidExpression() {
-        assertThatThrownBy(() -> calculator.calculate("abc"))
-            .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void shouldThrowOnEmptyExpression() {
-        assertThatThrownBy(() -> calculator.calculate(""))
-            .isInstanceOf(IllegalArgumentException.class);
+    void shouldRejectTraversalWithDotDot() {
+        assertThat(fsTools.read(tempDir.resolve("../etc/passwd").toString(), 1, 1)).contains("Access denied");
     }
 }
 ```
 
-### 8.3 UnitConverterToolTest
+### 8.3 GlobToolTest + GrepToolTest
 
-Create `src/test/java/com/example/cliai/agent/tools/UnitConverterToolTest.java`:
+Create `src/test/java/com/example/cliai/agent/tools/GlobToolTest.java`:
 
 ```java
 package com.example.cliai.agent.tools;
 
-import org.junit.jupiter.api.BeforeEach;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springaicommunity.agent.tools.GlobTool;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class UnitConverterToolTest {
+class GlobToolTest {
 
-    private UnitConverterTool converter;
+    @Test
+    void shouldGlobJavaFiles(@TempDir Path tempDir) throws IOException {
+        Files.createDirectories(tempDir.resolve("src"));
+        Files.writeString(tempDir.resolve("test.java"), "// code");
+        Files.writeString(tempDir.resolve("src/Util.java"), "// code");
+        Files.writeString(tempDir.resolve("config.txt"), "config");
 
-    @BeforeEach
-    void setUp() {
-        converter = new UnitConverterTool();
+        GlobTool globTool = GlobTool.builder().workingDirectory(tempDir).build();
+        String result = globTool.glob("**/*.java", tempDir.toString());
+        assertThat(result).contains("test.java");
+        assertThat(result).contains("Util.java");
     }
 
     @Test
-    void shouldConvertKmToMiles() {
-        String result = converter.convert(100, "km", "miles");
-        assertThat(result).contains("62.1371").contains("miles");
+    void shouldReturnEmptyForNoMatch() {
+        GlobTool globTool = GlobTool.builder().build();
+        String result = globTool.glob("**/*.nonexistent", ".");
+        assertThat(result).contains("No files");
+    }
+}
+```
+
+Create `src/test/java/com/example/cliai/agent/tools/GrepToolTest.java`:
+
+```java
+package com.example.cliai.agent.tools;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springaicommunity.agent.tools.GrepTool;
+import org.springaicommunity.agent.tools.GrepTool.OutputMode;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class GrepToolTest {
+
+    @Test
+    void shouldGrepForPattern(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("test.java"), "public class Foo {\n    @Tool\n    public String run() {}\n}");
+        GrepTool grepTool = GrepTool.builder().workingDirectory(tempDir).build();
+        String result = grepTool.grep("@Tool", tempDir.toString(), null, OutputMode.content,
+            null, null, null, null, null, null, null, null, null);
+        assertThat(result).contains("@Tool");
     }
 
     @Test
-    void shouldConvertMilesToKm() {
-        String result = converter.convert(62.1371, "miles", "km");
-        assertThat(result).contains("km");
-    }
-
-    @Test
-    void shouldConvertKgToLbs() {
-        String result = converter.convert(10, "kg", "lbs");
-        assertThat(result).contains("22.0462").contains("lbs");
-    }
-
-    @Test
-    void shouldConvertLbsToKg() {
-        String result = converter.convert(22.0462, "lbs", "kg");
-        assertThat(result).contains("kg");
-    }
-
-    @Test
-    void shouldConvertCelsiusToFahrenheit() {
-        String result = converter.convert(100, "celsius", "fahrenheit");
-        assertThat(result).contains("212.0").contains("°F");
-    }
-
-    @Test
-    void shouldConvertFahrenheitToCelsius() {
-        String result = converter.convert(212, "fahrenheit", "celsius");
-        assertThat(result).contains("100.0").contains("°C");
-    }
-
-    @Test
-    void shouldConvertLitersToGallons() {
-        String result = converter.convert(10, "liters", "gallons");
-        assertThat(result).contains("2.64172").contains("gallons");
-    }
-
-    @Test
-    void shouldConvertGallonsToLiters() {
-        String result = converter.convert(10, "gallons", "liters");
-        assertThat(result).contains("37.8541").contains("liters");
-    }
-
-    @Test
-    void shouldHandleZeroValue() {
-        String result = converter.convert(0, "km", "miles");
-        assertThat(result).contains("0.0").contains("miles");
-    }
-
-    @Test
-    void shouldHandleNegativeValue() {
-        String result = converter.convert(-40, "celsius", "fahrenheit");
-        assertThat(result).contains("-40.0").contains("°F");
-    }
-
-    @Test
-    void shouldReturnUnsupportedForUnknownConversion() {
-        String result = converter.convert(10, "km", "kg");
-        assertThat(result).contains("Unsupported conversion");
-    }
-
-    @Test
-    void shouldHandleCaseInsensitiveUnits() {
-        String result = converter.convert(100, "KM", "MILES");
-        assertThat(result).contains("62.1371").contains("miles");
+    void shouldReturnEmptyForNoMatch(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("test.java"), "nothing here");
+        GrepTool grepTool = GrepTool.builder().workingDirectory(tempDir).build();
+        String result = grepTool.grep("nonexistent_xyz_pattern", tempDir.toString(), null, OutputMode.content,
+            null, null, null, null, null, null, null, null, null);
+        assertThat(result).contains("No matches");
     }
 }
 ```
@@ -1095,7 +1034,7 @@ class ChatLoopTest {
             System.setOut(new PrintStream(output));
             chatLoop.run();
             String text = output.toString(StandardCharsets.UTF_8);
-            org.assertj.core.api.Assertions.assertThat(text).contains("/help", "CalculatorTool", "Conversation cleared.", "Goodbye!");
+            org.assertj.core.api.Assertions.assertThat(text).contains("/help", "FileSystemTools", "Conversation cleared.", "Goodbye!");
             verify(chatClient, never()).prompt();
         } finally { System.setIn(originalIn); System.setOut(originalOut); }
     }
@@ -1127,14 +1066,14 @@ class ChatLoopTest {
 
 ### 8.5b Additional Tests (see repo)
 
-Create `UserVisibleToolCallbackTest.java` (pure trace `passesArgumentsThroughUnchanged`), `ChatClientIntegrationTest.java` (real `gemma4:e4b-mlx` memory `shouldRememberContextAcrossTurns`), `ToolCallingEvalTest.java` (opt-in `gemma4:e4b-mlx` `calculatorPromptMustExecuteCalculatorTool` / `clarificationPromptMustExecuteAskUserQuestionTool` – asserts `[Tool] AskUserQuestionTool` trace + `CommandLineQuestionHandler` `System.in` mock), and `CommandLineQuestionHandlerTest.java` (4 tests for handler spec as in `3.4`).
+Create `UserVisibleToolCallbackTest.java` (pure trace `passesArgumentsThroughUnchanged`), `ChatClientIntegrationTest.java` (real `gemma4:e4b-mlx` memory `shouldRememberContextAcrossTurns`), `ToolCallingEvalTest.java` (opt-in `gemma4:e4b-mlx` `globPromptMustExecuteGlobTool` / `clarificationPromptMustExecuteAskUserQuestionTool` – asserts `[Tool] AskUserQuestionTool` trace + `CommandLineQuestionHandler` `System.in` mock), and `CommandLineQuestionHandlerTest.java` (4 tests for handler spec as in `3.4`).
 
 ### 8.6 Run Tests
 
 From top level (`Duke42/`):
 
 ```bash
-mvn test # CLI agent: 64 tests (3 evals skipped – add -Devals=true + Ollama gemma4:e4b-mlx; 2 Docker-gated opt-ins)
+mvn test # CLI agent: 58 tests (3 evals skipped – add -Devals=true + Ollama gemma4:e4b-mlx; 2 Docker-gated opt-ins)
 mvn test -Devals=true # same as above but runs ToolCallingEvalTest 3 with real Ollama model
 mvn test -pl backend # 14 tests
 ```
@@ -1163,16 +1102,7 @@ The system prompt is a `PromptTemplate` with a `{role}` placeholder (`SystemProm
 /temp reset
 ```
 
-### 9.2 Structured Output — `/convert` (Step 7)
-
-`UnitConversion` record → `BeanOutputConverter<UnitConversion>.getJsonSchema()` → `OllamaChatOptions.builder().outputSchema(schema)`:
-
-```
-/convert 100 km miles
-# Model answer is schema-validated JSON parsed into UnitConversion(value=62.14, unit=miles)
-```
-
-### 9.3 Multimodality — `/image` (Step 8)
+### 9.2 Multimodality — `/image` (Step 8)
 
 Vision via `UserMessage.builder().media(Media.builder()...)`:
 
@@ -1236,8 +1166,8 @@ spring-ai-cli-agent/
 │   │   ├── AgentConfiguration.java
 │   │   ├── UserVisibleToolCallback.java  # pure trace embellishment
 │   │   └── tools/
-│   │       ├── CalculatorTool.java
-│   │       └── UnitConverterTool.java
+│   │       ├── SandboxedGlobTool.java
+│   │       └── SandboxedGrepTool.java
 │   └── cli/
 │       ├── ChatLoop.java
 │       ├── SlashCommand.java              # command pattern interface for /help, /tools, etc.
@@ -1250,8 +1180,10 @@ spring-ai-cli-agent/
     │   ├── UserVisibleToolCallbackTest.java
     │   ├── CommandLineQuestionHandlerTest.java  # verifies handler spec: header≤12, options 2-4, multiSelect, free-text
     │   └── tools/
-    │       ├── CalculatorToolTest.java
-    │       └── UnitConverterToolTest.java
+    │       ├── FileSystemToolsTest.java
+    │       ├── GlobToolTest.java
+    │       ├── GrepToolTest.java
+    │       └── ToolWiringTest.java
     └── cli/
         ├── ChatLoopTest.java
         ├── ChatClientIntegrationTest.java   # needs Ollama gemma4:e4b-mlx (or lfm2.5)
@@ -1364,8 +1296,8 @@ spring.ai.ollama.chat.model=gemma4:e4b-mlx
 ```java
 package com.example.cliai.agent;
 
-import com.example.cliai.agent.tools.CalculatorTool;
-import com.example.cliai.agent.tools.UnitConverterTool;
+import com.example.cliai.agent.tools.SandboxedGlobTool;
+import com.example.cliai.agent.tools.SandboxedGrepTool;
 import org.springaicommunity.agent.tools.AskUserQuestionTool;
 import org.springaicommunity.agent.utils.CommandLineQuestionHandler;
 import org.springframework.ai.chat.client.ChatClient;
@@ -1394,8 +1326,15 @@ class AgentConfiguration {
             .build();
 
         // Visibility embellishment for all tools (including QnA) – pure trace, no definition mutation or spec decoration
+        java.nio.file.Path projectRoot = java.nio.file.Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        FileSystemTools fileSystemTools = FileSystemTools.builder()
+            .allowedDirectory(projectRoot).build();
+        GlobTool globTool = GlobTool.builder().workingDirectory(projectRoot).build();
+        GrepTool grepTool = GrepTool.builder().workingDirectory(projectRoot).build();
+        SandboxedGlobTool sandboxedGlob = new SandboxedGlobTool(globTool, projectRoot);
+        SandboxedGrepTool sandboxedGrep = new SandboxedGrepTool(grepTool, projectRoot);
         ToolCallback[] allWithTrace = java.util.Arrays.stream(
-                ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
+                ToolCallbacks.from(askUserQuestionTool, fileSystemTools, sandboxedGlob, sandboxedGrep))
             .map(UserVisibleToolCallback::new)
             .toArray(ToolCallback[]::new);
 
@@ -1455,9 +1394,9 @@ final class UserVisibleToolCallback implements ToolCallback {
 }
 ```
 
-### Complete CalculatorTool.java / UnitConverterTool.java
+### Complete SandboxedGlobTool.java / SandboxedGrepTool.java
 
-Exactly as in Steps 4.1/5.1 with `public class` and `context.setVariable("pi", Math.PI)` for `CalculatorTool` – copy verbatim to match repo.
+These wrapper classes enforce `allowedDirectory` restrictions on `GlobTool` and `GrepTool`. See `src/main/java/com/example/cliai/agent/tools/SandboxedGlobTool.java` and `SandboxedGrepTool.java` in the repo for the full implementation.
 
 ---
 
@@ -1686,7 +1625,7 @@ The final `AgentConfiguration.java` (see `## Complete AgentConfiguration.java`) 
 AskUserQuestionTool askUserQuestionTool = AskUserQuestionTool.builder()
     .questionHandler(new CommandLineQuestionHandler())
     .build();
-ToolCallback[] allWithTrace = ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool())
+ToolCallback[] allWithTrace = ToolCallbacks.from(askUserQuestionTool, fileSystemTools, sandboxedGlob, sandboxedGrep)
     .map(UserVisibleToolCallback::new).toArray(ToolCallback[]::new);
 ChatClient.Builder builder = ChatClient.builder(chatModel)
     .defaultSystem("You are an interactive CLI assistant...")

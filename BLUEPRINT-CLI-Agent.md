@@ -56,8 +56,9 @@ Duke42/
 │   │   │   ├── AgentConfiguration.java      # ChatClient + memory + tools + MCP
 │   │   │   ├── UserVisibleToolCallback.java # pure trace embellishment
 │   │   │   └── tools/
-│   │   │       ├── CalculatorTool.java
-│   │   │       └── UnitConverterTool.java   # later: StructuredOutputConverter
+│   │   │       ├── FileSystemTools.java
+│   │   │       ├── GlobTool.java
+│   │   │       └── GrepTool.java
 │   │   ├── cli/
 │   │   │   ├── ChatLoop.java                # streaming + thinking + SlashCommandHandler
 │   │   │   ├── SlashCommand.java            # command pattern interface
@@ -65,7 +66,7 @@ Duke42/
 │   │   └── rag/
 │   │       ├── RagConfiguration.java        # VectorStore + EmbeddingModel + ETL
 │   │       └── IngestionService.java
-│   └── src/test/java/             # 64 tests (59 run + 3 evals skipped + 2 Docker-gated opt-ins)
+│   └── src/test/java/             # 58 tests (53 run + 5 skipped: 3 evals + 2 Docker-gated)
 │
 ├── backend/                       # Enterprise demo (Vaadin + REST + GraphQL + MCP)
 │   ├── pom.xml
@@ -102,7 +103,7 @@ Duke42/
 │                ┌────┴─────┐                     │
 │                │ ChatClient│ ← Prompts (System/User, PromptTemplate, ChatOptions)
 │                │ + Advisors│ ← Memory + SimpleLogger + ToolCallingAdvisor
-│                │ + Tools   │ ← AskUserQuestion + Calculator + MCP tools
+│                │ + Tools   │ ← AskUserQuestion + FileSystemTools + Glob + Grep + MCP tools
 │                │ + RAG     │ ← ETL → VectorStore (PgVector) + EmbeddingModel
 │                └────┬─────┘                     │
 │                     │                           │
@@ -153,29 +154,29 @@ Duke42/
 
 **Verify**: `Help me learn Spring AI` → tool asks `Header: question` `1. label - desc`.
 
-### STEP 5: Custom Tools (Tool Calling – @Tool)
+### STEP 5: File System Tools (Tool Calling – @Tool)
 
-**Concept**: `@Tool(description="...")` + `@ToolParam` → `ToolCallbacks.from(new CalculatorTool())`. `description` is selection hint.
+**Concept**: `@Tool(description="...")` + `@ToolParam` → `ToolCallbacks.from(fileSystemTools, globTool, grepTool)`. `description` is selection hint.
 
-**What you'll build**: `CalculatorTool` (`SpEL` `StandardEvaluationContext` `pi`).
+**What you'll build**: `FileSystemTools` (read/write/edit with `allowedDirectory` sandbox), `GlobTool` (file pattern matching), `GrepTool` (regex search).
 
-**Verify**: `(15 * 7) + 23` → `128.0` via `[Tool] calculate`.
+**Verify**: `Read the pom.xml` → `[Tool] Read`, `Find all Java files` → `[Tool] Glob`, `Search for @Tool annotations` → `[Tool] Grep`.
 
 ### STEP 6: Multiple Tools (Tool Calling – selection)
 
-**Concept**: AI picks via `description` among `AskUserQuestion`, `Calculator`, `UnitConverter`; can chain.
+**Concept**: AI picks via `description` among `AskUserQuestion`, `FileSystemTools`, `GlobTool`, `GrepTool`; can chain.
 
-**What you'll build**: `UnitConverterTool` (`km/miles` etc.) + `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` pure trace (no `if-else`).
+**What you'll build**: Three file system tools + `ToolCallbacks.from(...).map(UserVisibleToolCallback::new)` pure trace (no `if-else`).
 
-**Verify**: `Convert 100 km to miles` → `UnitConverter`, `If I drive 100 km at 60 mph...` → both.
+**Verify**: `Read the README` → `FileSystemTools.read()`, `Find all test files` → `GlobTool`, `Search for "ChatClient" in Java files` → `GrepTool`.
 
 ### STEP 7: Structured Output (Structured Output)
 
-**Concept**: `Structured Output` — `BeanOutputConverter<T>` + JSON Schema (`@JsonProperty(required=true)`) vs free text. Ollama `format="json"` vs `outputSchema`.
+**Concept**: `Structured Output` — `BeanOutputConverter<T>` + JSON Schema (`@JsonProperty(required=true)`) vs free text. Ollama `format="json"` vs `outputSchema`. The agent uses this pattern internally for any tool that requires structured JSON responses.
 
-**What you'll build**: `UnitConversion` record → `BeanOutputConverter<UnitConversion>.getJsonSchema()` → `OllamaChatOptions.builder().outputSchema(converter.getJsonSchema())` for `convert`.
+**What you'll build**: Understanding of how `BeanOutputConverter` derives JSON Schema from a Java record and parses model output back into it. The `/convert` command example was removed with UnitConverterTool; the same pattern applies to any structured output use case.
 
-**Verify**: `Convert 100 km` returns `{"value":62.14,"unit":"miles"}` validated.
+**Verify**: Review `BeanOutputConverter` usage in the codebase for schema derivation and parsing.
 
 ### STEP 8: Multimodality (Multimodality, Models – Vision/Audio)
 
@@ -239,7 +240,7 @@ Duke42/
 
 **What you'll build**: `pom.xml` `spring-ai-spring-boot-testcontainers:2.0.0` + `testcontainers:ollama` (test scope, already added), `ChatClientIntegrationTest` with `OllamaContainer` `@ServiceConnection`, `ToolCallingEvalTest` (`-Devals=true`) as `LLM-as-a-Judge` (trace contains `[Tool] AskUserQuestionTool`).
 
-**Verify**: `mvn test` (mocked, no Ollama) → 64 tests; `mvn test -Devals=true` (real `gemma4:e4b-mlx`) → 3 evals PASS; `mvn test -Dmcp.integration=true` (polyglot `9000`).
+**Verify**: `mvn test` (mocked, no Ollama) → 58 tests; `mvn test -Devals=true` (real `gemma4:e4b-mlx`) → 3 evals PASS; `mvn test -Dmcp.integration=true` (polyglot `9000`).
 
 ---
 
@@ -253,7 +254,7 @@ After all 15 steps, the project has:
 | Prompts | System/User/Assistant, PromptTemplate, ChatOptions | `prompt.html` |
 | Chat memory | Advisors, ChatMemory | `chat-memory.html` |
 | AskUserQuestionTool | Tool Calling (QnA), user interaction | `spring.io/blog/2026/01/16/...` + `AskUserQuestionTool.md` |
-| Calculator/UnitConverter | Custom Tools, Tool selection | `tools.html` |
+| FileSystemTools/GlobTool/GrepTool | File System Tools, Tool selection | `tools.html` |
 | Structured Output | BeanOutputConverter, JSON Schema | `structured-output.html` |
 | Multimodality | Media, vision+audio | `multimodality.html` |
 | Models | Chat/Embedding/Image/Audio/Moderation | `chat/ollama-chat.html`, `comparison.html` |
@@ -263,7 +264,7 @@ After all 15 steps, the project has:
 | Thinking | OllamaChatOptions.enableThinking(), reasoningContent | `ollama-chat.html#_thinking_mode_reasoning` |
 | Observability | Micrometer | `observability/index.html` |
 | Dev-time Services | Docker Compose, Testcontainers | `docker-compose.html`, `testcontainers.html` |
-| Packaging + Tests | Executable jar, 64 tests + evals | `spring-boot:run`, `testcontainers.html`, `testing/evaluation` |
+| Packaging + Tests | Executable jar, 58 tests + evals | `spring-boot:run`, `testcontainers.html`, `testing/evaluation` |
 
 ### `pom.xml` (complete, CLI)
 
@@ -349,7 +350,7 @@ volumes:
 
 The 15 steps map to sections:
 - Steps 1-3 → "Project Setup" + "Building the Agent" (`ChatClient`, `Prompts`, `Memory`)
-- Steps 4-6 → "Custom Tools" (`AskUserQuestion`, `Calculator`, `UnitConverter`)
+- Steps 4-6 → "File System Tools" (`AskUserQuestion`, `FileSystemTools`, `GlobTool`, `GrepTool`)
 - Steps 7-10 → "Advanced" (`Structured Output`, `Multimodality`, `Models`, `RAG`)
 - Steps 11-15 → "Production" (`MCP`, `Streaming`, `Thinking`, `Observability`, `Testing`)
 

@@ -169,3 +169,9 @@ Upgrade path: Adopt Spring Shell 4.1.x when released (aligned with Boot 4.1.x) a
 remove the version-skew acceptance. Alternatively, downgrade Boot to 4.0.7 (Shell's
 true baseline) if a fully-clean pairing is desired — this would create monorepo skew
 with the backend module.
+
+## Decision 9 — Symlink bypass in sandbox wrappers (2026-08-31)
+
+`SandboxedGlobTool` and `SandboxedGrepTool` enforce `allowedDirectory` restrictions on path arguments. Initially used `Path.of(path).toAbsolutePath().normalize().startsWith(allowedDirectory)` which did not resolve symlinks — a symlink inside `allowedDirectory` pointing outside would pass the check.
+
+**Fix applied:** `isWithinAllowedDirectory` now uses `toRealPath()` when the path exists (resolves symlinks), falling back to `toAbsolutePath().normalize()` for non-existent paths. Both the `target` and `allowedDirectory` are resolved for consistent comparison. Symlink escape tests added to `GlobToolTest` and `GrepToolTest`.
