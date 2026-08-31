@@ -21,6 +21,7 @@ class ConfigPropertiesTest {
     @Test
     void ollamaModelIsBoundFromTestProfile() {
         String model = environment.getProperty("spring.ai.ollama.chat.model");
-        assertThat(model).isNotNull().isEqualTo("gemma4:e4b-mlx");
+        // Default is gemma4:e4b-mlx (Mac MLX); CI pins gemma4:e4b via -D.
+        assertThat(model).isIn("gemma4:e4b-mlx", "gemma4:e4b");
     }
 }

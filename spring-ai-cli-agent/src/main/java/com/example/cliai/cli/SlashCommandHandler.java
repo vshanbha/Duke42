@@ -115,10 +115,9 @@ final class SlashCommandHandler {
         @Override public String description() { return "Show thinking config/help"; }
         @Override public boolean supports(String input) { return "/think".equalsIgnoreCase(input.trim()); }
         @Override public Result execute(String input, Context context) {
-            System.out.println("\nThinking is model-controlled via spring.ai.ollama.chat.think (or spring.ai.ollama.chat.options.think) in application.properties.");
+            System.out.println("\nThinking is model-controlled via spring.ai.ollama.chat.think in application.properties.");
             System.out.println("Current model: gemma4:e4b-mlx supports thinking (tools+thinking). Enable via:");
             System.out.println("  spring.ai.ollama.chat.think=medium  # or true/false/low/medium/high (OllamaChatOptions.enableThinking())");
-            System.out.println("  # or spring.ai.ollama.chat.options.think=medium");
             System.out.println("Docs: https://docs.spring.io/spring-ai/reference/api/chat/ollama-chat.html#_thinking_mode_reasoning");
             System.out.println(" Docs reasoning_content via OpenAI compatibility: ...#_reasoning_content_via_openai_compatibility");
             System.out.println("Manual indicator: CLI shows 'Thinking...' while waiting; thinking content from metadata \"thinking\"/\"reasoningContent\" is shown as [Thinking] if available.\n");

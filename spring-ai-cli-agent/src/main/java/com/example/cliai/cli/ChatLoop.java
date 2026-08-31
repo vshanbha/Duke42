@@ -88,6 +88,9 @@ class ChatLoop {
      */
     boolean processLine(String input) {
         String trimmed = input == null ? "" : input;
+        if (trimmed.isBlank()) {
+            return false;
+        }
         SlashCommand.Result result = slashHandler.handle(trimmed, slashContext);
         if (result == SlashCommand.Result.EXIT) {
             return true;
@@ -176,7 +179,6 @@ class ChatLoop {
     private void streamAndPrint(ChatClient.ChatClientRequestSpec spec) {
         new AttributedString("Thinking... ", AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE)).print(terminal);
         terminal.writer().flush();
-        AtomicBoolean firstContent = new AtomicBoolean(true);
         AtomicBoolean thinkingPrinted = new AtomicBoolean(false);
         AtomicBoolean thinkingOn = new AtomicBoolean(false);
         AtomicBoolean aiOn = new AtomicBoolean(false);
