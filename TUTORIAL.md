@@ -245,7 +245,7 @@ mvn spring-boot:run
 # Type 'exit' to return to the agent> shell (chat re-enters the loop, exit quits)
 ```
 
-> Startup behavior: `ChatAutoStarter` (an `ApplicationRunner` before Spring Shell's own loop) calls `chat()` when a console is attached and no shell command args were passed. Non-interactive runs (pipes, CI, `java -jar app.jar help`) skip auto-start. Disable with `chat.auto-start=false`. The shell prompt itself is `agent>` (via `AgentPromptProvider`).
+> Startup behavior: `ChatAutoStarter` (an `ApplicationRunner` before Spring Shell's own loop) calls `chat()` when a console is attached and no shell command args were passed. Non-interactive runs (pipes, CI, `java -jar app.jar help`) skip auto-start. Disable with `chat.auto-start=false`. The shell prompt itself is `agent>` (via `AgentPromptProvider`). Tests are doubly guarded: `src/test/resources/application.properties` sets `spring.shell.interactive.enabled=false` and surefire provides no console, so the runner never blocks the suite.
 
 ### 1.6 Test Implementation
 
@@ -666,7 +666,7 @@ The jar includes all dependencies and the Spring Boot loader. Anyone with Java 1
 
 ### 7.3 Test Implementation
 
-No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`63 tests` with `gemma4:e4b-mlx`).
+No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`64 tests` with `gemma4:e4b-mlx`).
 
 ### 7.4 Further Reading
 
@@ -1093,7 +1093,7 @@ Create `UserVisibleToolCallbackTest.java` (pure trace `passesArgumentsThroughUnc
 From top level (`Duke42/`):
 
 ```bash
-mvn test # CLI agent: 63 tests (3 evals skipped – add -Devals=true + Ollama gemma4:e4b-mlx; 2 Docker-gated opt-ins)
+mvn test # CLI agent: 64 tests (3 evals skipped – add -Devals=true + Ollama gemma4:e4b-mlx; 2 Docker-gated opt-ins)
 mvn test -Devals=true # same as above but runs ToolCallingEvalTest 3 with real Ollama model
 mvn test -pl backend # 14 tests
 ```
@@ -1225,7 +1225,7 @@ spring-ai-cli-agent/
 
 ## Complete pom.xml
 
-> Matches `spring-ai-cli-agent/pom.xml` in dependencies (Boot 4.1.0, Spring AI 2.0.0; comments and the `testcontainers-ollama.version` property abbreviated) – use this as final state if you followed Steps 1, 3.1, 8.1 incrementally. Step 1's starter pom uses the same Boot 4.1.0 parent; the RAG/Shell/actuator/testcontainers deps below arrive in Steps 9–11/14–15. For byte-identical build config see the checked-in pom (it pins `testcontainers-ollama.version=1.21.3` via a `<properties>` block):
+> Matches `spring-ai-cli-agent/pom.xml` dependency-for-dependency (Boot 4.1.0, Spring AI 2.0.0; only XML comments trimmed) – use this as final state if you followed Steps 1, 3.1, 8.1 incrementally. Step 1's starter pom uses the same Boot 4.1.0 parent; the RAG/Shell/actuator/testcontainers deps below arrive in Steps 9–11/14–15:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1251,6 +1251,7 @@ spring-ai-cli-agent/
     <properties>
         <java.version>17</java.version>
         <spring-ai.version>2.0.0</spring-ai.version>
+        <testcontainers-ollama.version>1.21.3</testcontainers-ollama.version>
     </properties>
 
     <dependencyManagement>
@@ -1314,19 +1315,24 @@ spring-ai-cli-agent/
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>ollama</artifactId>
+            <version>${testcontainers-ollama.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers-ollama.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
+            <version>${testcontainers-ollama.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <!-- Above matches the checked-in pom dependency-for-dependency (only XML comments trimmed) -->
 
     <build>
         <plugins>
@@ -1578,7 +1584,7 @@ class ChatLoop implements CommandLineRunner {
 }
 ```
 
-> **Slash commands via command pattern:** All `/help`, `/tools`, `/clear`, `/think`, `/exit` (and aliases `exit`/`quit`) are handled in `SlashCommand.java` (`interface SlashCommand {name(), description(), supports(), execute()}`) and `SlashCommandHandler.java` (registry `List<SlashCommand>` + `handle()`). `ChatLoop` only delegates to `slashHandler.handle(input, slashContext)` – no `if-else` chain in `ChatLoop`. See `src/main/java/com/example/cliai/cli/SlashCommand*.java`.
+> **Slash commands via command pattern:** All `/help`, `/tools`, `/clear`, `/think`, `/exit` (and aliases `exit`/`quit`) are handled in `SlashCommand.java` (`interface SlashCommand {name(), description(), supports(), execute()}`) and `SlashCommandHandler.java` (registry `List<SlashCommand>` + `handle()`). `ChatLoop` only delegates to `slashHandler.handle(input, slashContext)` – no `if-else` chain in `ChatLoop`. See `src/main/java/com/example/cliai/cli/SlashCommand.java` and `SlashCommandHandler.java`.
 
 > **Thinking indicator:** `ChatLoop` shows `Thinking...` while waiting for first `chatResponse()` chunk and, if `spring.ai.ollama.chat.think=medium` (or `true`/`low`/`high`), prints `[Thinking] <content>` from `ChatResponse.getResult().getMetadata().get("thinking")` / `get("reasoningContent")` per [Ollama docs](https://docs.spring.io/spring-ai/reference/api/chat/ollama-chat.html#_thinking_mode_reasoning) and `#_reasoning_content_via_openai_compatibility`. Enable via `application.properties` and `/think` shows help.
 

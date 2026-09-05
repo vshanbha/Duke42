@@ -66,7 +66,7 @@ Duke42/
 │   │   └── rag/
 │   │       ├── RagConfiguration.java        # VectorStore + EmbeddingModel + ETL
 │   │       └── IngestionService.java
-│   └── src/test/java/             # 63 tests (58 run + 5 skipped: 3 evals + 2 Docker-gated)
+│   └── src/test/java/             # 64 tests (59 run + 5 skipped: 3 evals + 2 Docker-gated)
 │
 ├── backend/                       # Enterprise demo (Vaadin + REST + GraphQL + MCP)
 │   ├── pom.xml
@@ -240,7 +240,7 @@ Duke42/
 
 **What you'll build**: `pom.xml` `spring-ai-spring-boot-testcontainers:2.0.0` + `testcontainers:ollama` (test scope, already added), `ChatClientIntegrationTest` with `OllamaContainer` `@ServiceConnection`, `ToolCallingEvalTest` (`-Devals=true`) as `LLM-as-a-Judge` (trace contains `[Tool] AskUserQuestionTool`).
 
-**Verify**: `mvn test` (mocked, no Ollama) → 63 tests; `mvn test -Devals=true` (real `gemma4:e4b-mlx`) → 3 evals PASS; `mvn test -Dmcp.integration=true` (polyglot `9000`).
+**Verify**: `mvn test` (mocked, no Ollama) → 64 tests; `mvn test -Devals=true` (real `gemma4:e4b-mlx`) → 3 evals PASS; `mvn test -Dmcp.integration=true` (polyglot `9000`).
 
 ---
 
@@ -264,7 +264,7 @@ After all 15 steps, the project has:
 | Thinking | OllamaChatOptions.enableThinking(), reasoningContent | `ollama-chat.html#_thinking_mode_reasoning` |
 | Observability | Micrometer | `observability/index.html` |
 | Dev-time Services | Docker Compose, Testcontainers | `docker-compose.html`, `testcontainers.html` |
-| Packaging + Tests | Executable jar, 63 tests + evals | `spring-boot:run`, `testcontainers.html`, `testing/evaluation` |
+| Packaging + Tests | Executable jar, 64 tests + evals | `spring-boot:run`, `testcontainers.html`, `testing/evaluation` |
 
 ### `pom.xml` (complete, CLI)
 

@@ -21,9 +21,14 @@ import org.springframework.stereotype.Component;
  * Shell handle them). Spring {@code --key=value} options (e.g.
  * {@code --rag.enabled=true}) do not block auto-start.
  *
- * <p>Runs before Spring Shell's own {@code ApplicationRunner} loop, so after
- * leaving the chat ({@code exit}) the user lands at the {@code agent>}
- * shell prompt where {@code chat} re-enters and {@code exit} quits.
+ * <p>Runs before Spring Shell's own {@code ApplicationRunner} loop
+ * ({@code springShellApplicationRunner} carries no {@code @Order}, i.e.
+ * {@code LOWEST_PRECEDENCE} — verified against spring-shell-core-autoconfigure
+ * 4.0.3), so after leaving the chat ({@code exit}) the user lands at the
+ * {@code agent>} shell prompt where {@code chat} re-enters and {@code exit}
+ * quits. If a future Shell version orders its runner earlier, this
+ * {@code HIGHEST_PRECEDENCE} still wins; {@code ChatAutoStarterTest}
+ * pins the annotation.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -38,6 +43,7 @@ class ChatAutoStarter implements ApplicationRunner {
         this(chatLoop, () -> System.console() != null);
     }
 
+    /** Test-only seam: injects console detection so tests need no TTY. */
     ChatAutoStarter(ChatLoop chatLoop, BooleanSupplier consoleAttached) {
         this.chatLoop = chatLoop;
         this.consoleAttached = consoleAttached;

@@ -41,7 +41,7 @@ Duke42 has two sides: a **learning path** (Spring AI CLI Agent) and an **enterpr
 - **Web UI**: Vaadin chat interface for enterprise demos
 - **REST API**: For JavaScript/React developers
 - **GraphQL**: Flexible query layer for JS/React clients
-- **Tested**: 77 tests (63 CLI + 14 backend)
+- **Tested**: 78 tests (64 CLI + 14 backend)
 
 ---
 
@@ -101,7 +101,7 @@ mvn spring-boot:run
 **5. Run tests**
 
 ```bash
-# CLI Agent tests (63 tests; 3 evals need -Devals=true + Ollama,
+# CLI Agent tests (64 tests; 3 evals need -Devals=true + Ollama,
 # 2 Docker-gated: -Dtc.ollama=true / -Dtc.pgvector=true)
 cd spring-ai-cli-agent && mvn test
 

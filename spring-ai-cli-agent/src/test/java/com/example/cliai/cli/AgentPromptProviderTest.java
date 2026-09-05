@@ -9,6 +9,6 @@ class AgentPromptProviderTest {
     @Test
     void shouldShowAgentPrompt() {
         AgentPromptProvider provider = new AgentPromptProvider();
-        assertThat(provider.getPrompt().toString()).contains("agent>");
+        assertThat(provider.getPrompt().toString()).isEqualTo("agent> ");
     }
 }
