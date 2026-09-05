@@ -666,7 +666,7 @@ The jar includes all dependencies and the Spring Boot loader. Anyone with Java 1
 
 ### 7.3 Test Implementation
 
-No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`64 tests` with `gemma4:e4b-mlx`).
+No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`68 tests` with `gemma4:e4b-mlx`).
 
 ### 7.4 Further Reading
 
@@ -1093,7 +1093,7 @@ Create `UserVisibleToolCallbackTest.java` (pure trace `passesArgumentsThroughUnc
 From top level (`Duke42/`):
 
 ```bash
-mvn test # CLI agent: 64 tests (3 evals skipped – add -Devals=true + Ollama gemma4:e4b-mlx; 2 Docker-gated opt-ins)
+mvn test # CLI agent: 68 tests (3 evals skipped – add -Devals=true + Ollama gemma4:e4b-mlx; 2 Docker-gated opt-ins)
 mvn test -Devals=true # same as above but runs ToolCallingEvalTest 3 with real Ollama model
 mvn test -pl backend # 14 tests
 ```
@@ -1191,6 +1191,8 @@ spring-ai-cli-agent/
 │   │       └── SandboxedGrepTool.java        # FileSystemTools/GlobTool/GrepTool come from spring-ai-agent-utils:0.10.0
 │   ├── cli/
 │   │   ├── ChatLoop.java                     # Spring Shell @Command(value="chat"), processLine(), streamAndPrint()
+│   │   ├── ChatAutoStarter.java              # auto-enters chat on interactive startup (chat.auto-start=false disables)
+│   │   ├── AgentPromptProvider.java          # agent> shell prompt
 │   │   ├── SlashCommand.java              # command pattern interface for /help, /tools, etc.
 │   │   └── SlashCommandHandler.java       # registry for all slash commands
 │   └── rag/
@@ -1209,7 +1211,10 @@ spring-ai-cli-agent/
     │       ├── GrepToolTest.java             # 6 tests
     │       └── ToolWiringTest.java           # 2 tests
     ├── cli/
-    │   ├── ChatLoopTest.java
+    │   ├── ChatLoopTest.java               # 6 tests incl. entry banner
+    │   ├── ChatAutoStarterTest.java        # 5 tests (guards + ordering)
+    │   ├── ChatAutoStarterConditionTest.java # 3 tests (chat.auto-start kill-switch)
+    │   ├── AgentPromptProviderTest.java    # 1 test (agent> prompt)
     │   ├── ChatLoopArgsTest.java
     │   ├── ChatClientIntegrationTest.java   # needs Ollama gemma4:e4b-mlx
     │   ├── ConfigPropertiesTest.java

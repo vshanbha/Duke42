@@ -105,4 +105,19 @@ class ChatLoopTest {
         verify(streamSpec).chatResponse();
         org.assertj.core.api.Assertions.assertThat(out.toString(StandardCharsets.UTF_8)).contains("AI: ");
     }
+
+    @Test
+    void shouldPrintEntryBanner() {
+        ChatClient chatClient = mock(ChatClient.class);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Terminal terminal = mock(Terminal.class);
+        when(terminal.writer()).thenReturn(new java.io.PrintWriter(out, true));
+        ChatLoop chatLoop = new ChatLoop(chatClient, terminal);
+
+        chatLoop.printBanner();
+
+        org.assertj.core.api.Assertions.assertThat(out.toString(StandardCharsets.UTF_8))
+            .contains("chatting directly")
+            .contains("Type /help");
+    }
 }
