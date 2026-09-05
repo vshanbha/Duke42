@@ -19,7 +19,7 @@ cd polyglot && java -jar target/polyglot-runner.jar  # Polyglot MCP server (port
 From top level (`Duke42/`):
 
 ```bash
-mvn test # all modules: spring-ai-cli-agent 63 + backend 14
+mvn test # all modules: spring-ai-cli-agent 64 + backend 14
 mvn test -pl spring-ai-cli-agent -am # only CLI agent
 mvn test -pl backend -am # only backend
 ```
@@ -27,7 +27,7 @@ mvn test -pl backend -am # only backend
 From module:
 
 ```bash
-# CLI Agent: 63 tests (58 run + 5 skipped: 3 evals need -Devals=true + Ollama,
+# CLI Agent: 64 tests (59 run + 5 skipped: 3 evals need -Devals=true + Ollama,
 # 2 Docker-gated opt-ins: -Dtc.ollama=true, -Dtc.pgvector=true)
 cd spring-ai-cli-agent && mvn test
 # opt-in evals with Ollama gemma4:e4b-mlx (local default) or gemma4:e4b (CI via -Dspring.ai.ollama.chat.model)
@@ -45,7 +45,7 @@ cd backend && mvn test -Dmcp.integration=true # or mvn test -Dmcp.integration=tr
 
 | Module | Purpose | Port | Tests |
 |--------|---------|------|-------|
-| `spring-ai-cli-agent/` | CLI Agent learning project | non-web | 63 (58 run + 5 skipped: 3 evals + 2 Docker-gated opt-ins) |
+| `spring-ai-cli-agent/` | CLI Agent learning project | non-web | 64 (59 run + 5 skipped: 3 evals + 2 Docker-gated opt-ins) |
 | `backend/` | Enterprise demo (Vaadin + REST + GraphQL + MCP) | 8080 | 14 (10 unit + 4 e2e via failsafe) |
 | `polyglot/` | GraalVM Python integration (MCP server) | 9000 | 3 (integration) |
 | `ui/` | Legacy JavaFX desktop client (optional, not in parent build) | — | — |

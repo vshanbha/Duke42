@@ -31,7 +31,7 @@ A complete learning project that teaches Spring AI concepts step by step:
 5. Multiple tool calling flow
 6. SimpleLoggerAdvisor for debugging
 7. Executable jar packaging
-8. Unit tests (63 tests: FileSystemTools, GlobTool, GrepTool, SandboxedGlobTool, SandboxedGrepTool, AgentConfiguration, ChatLoop, shell startup)
+8. Unit tests (64 tests: FileSystemTools, GlobTool, GrepTool, SandboxedGlobTool, SandboxedGrepTool, AgentConfiguration, ChatLoop, shell startup)
 
 ---
 
@@ -143,7 +143,7 @@ java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 ```bash
 cd spring-ai-cli-agent
 mvn test
-# 63 tests covering FileSystemTools, GlobTool, GrepTool, SandboxedGlobTool, SandboxedGrepTool, AgentConfiguration, ChatLoop
+# 64 tests covering FileSystemTools, GlobTool, GrepTool, SandboxedGlobTool, SandboxedGrepTool, AgentConfiguration, ChatLoop
 ```
 
 ---

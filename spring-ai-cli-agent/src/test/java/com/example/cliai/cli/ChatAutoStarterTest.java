@@ -3,12 +3,22 @@ package com.example.cliai.cli;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.DefaultApplicationArguments;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 class ChatAutoStarterTest {
+
+    @Test
+    void shouldRunBeforeShellLoop() {
+        Order order = ChatAutoStarter.class.getAnnotation(Order.class);
+        assertThat(order).isNotNull();
+        assertThat(order.value()).isEqualTo(Ordered.HIGHEST_PRECEDENCE);
+    }
 
     @Test
     void shouldEnterChatOnInteractiveStartup() {

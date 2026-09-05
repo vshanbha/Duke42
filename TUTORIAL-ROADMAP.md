@@ -201,7 +201,7 @@ java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 **Verification**:
 ```bash
 mvn test
-# 63 tests should pass
+# 64 tests should pass
 ```
 
 ### Workshop 9: Enterprise Integration Patterns (2 hours)
