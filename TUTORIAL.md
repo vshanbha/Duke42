@@ -4,7 +4,7 @@ A hands-on guide to building a terminal-based AI assistant using Spring AI, with
 
 **Time**: 3-4 hours  
 **Prerequisites**: Java 17+, Maven 3.6+, Ollama  
-**Stack**: Spring Boot 4 + Spring AI 2.0 + Ollama (lfm2.5)
+**Stack**: Spring Boot 4.1 + Spring AI 2.0 + Ollama (gemma4:e4b-mlx default; lfm2.5 works as a smaller alternative)
 
 ---
 
@@ -39,11 +39,13 @@ mvn -version
 # macOS / Linux
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull a model with tool-calling support
-ollama pull lfm2.5
+# Pull the default model with tool-calling support
+ollama pull gemma4:e4b-mlx
 
 # Verify it works
-ollama run lfm2.5 "Say hello"
+ollama run gemma4:e4b-mlx "Say hello"
+
+# Smaller alternative (5.2 GB): ollama pull lfm2.5
 ```
 
 **Why Ollama?** Free, private, no API keys, no billing. Everything runs on your machine.
@@ -70,7 +72,7 @@ Create `pom.xml`:
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.0</version>
+        <version>4.1.0</version>
         <relativePath/>
     </parent>
 
@@ -103,6 +105,10 @@ Create `pom.xml`:
             <artifactId>spring-ai-starter-model-ollama</artifactId>
         </dependency>
     </dependencies>
+
+    <!-- Steps 3/8–11/14–15 add: spring-ai-starter-mcp-client, spring-ai-pgvector-store,
+         spring-ai-vector-store-advisor, spring-ai-agent-utils:0.10.0, spring-shell-starter/jline 4.0.3,
+         spring-boot-starter-actuator, spring-boot-starter-test + testcontainers (see Complete pom.xml) -->
 
     <build>
         <plugins>
@@ -138,8 +144,10 @@ Create `src/main/resources/application.properties`:
 
 ```properties
 spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.chat.model=lfm2.5
+spring.ai.ollama.chat.model=gemma4:e4b-mlx
 ```
+
+> Checked-in default is `gemma4:e4b-mlx` (Mac MLX). CI pins the Linux build via `-Dspring.ai.ollama.chat.model=gemma4:e4b`. `lfm2.5` works as a smaller tool-calling alternative.
 
 ### 1.2 Create the Entry Point
 
@@ -570,13 +578,13 @@ mvn spring-boot:run
 
 ### 5.4 Test Implementation
 
-* `src/test/java/com/example/cliai/agent/tools/GlobToolTest.java:2` – 2 tests (glob pattern matching, empty results)
-* `src/test/java/com/example/cliai/agent/tools/GrepToolTest.java:2` – 2 tests (regex search, empty results)
+* `src/test/java/com/example/cliai/agent/tools/GlobToolTest.java:6` – 6 tests (glob pattern matching, empty results, reject outside directory, reject traversal, default to allowed directory, reject symlink escape)
+* `src/test/java/com/example/cliai/agent/tools/GrepToolTest.java:6` – 6 tests (regex search, empty results, reject outside directory, reject traversal, default to allowed directory, reject symlink escape)
 * `src/test/java/com/example/cliai/agent/tools/ToolWiringTest.java:2` – 2 tests (correct callback count, valid definitions)
 
 ```bash
 mvn test # top-level
-# 6 tests for glob/grep tools, including sandbox wrappers
+# 14 tests for glob/grep tools + wiring (22 with FileSystemToolsTest:8)
 ```
 
 ### 5.5 Further Reading
@@ -766,6 +774,8 @@ class FileSystemToolsTest {
 
 ### 8.3 GlobToolTest + GrepToolTest
 
+> Samples below are excerpts (2 tests each). The checked-in files carry 6 tests each — the extra 4 per file cover the sandbox wrappers (reject outside directory, reject traversal, default to allowed directory, reject symlink escape). See `src/test/java/com/example/cliai/agent/tools/GlobToolTest.java` and `GrepToolTest.java`.
+
 Create `src/test/java/com/example/cliai/agent/tools/GlobToolTest.java`:
 
 ```java
@@ -881,7 +891,9 @@ class AgentConfigurationTest {
         ChatModel chatModel = mock(ChatModel.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider = mock(ObjectProvider.class);
-        ChatClient chatClient = config.chatClient(chatModel, mcpProvider);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor> ragProvider = mock(ObjectProvider.class);
+        ChatClient chatClient = config.chatClient(chatModel, mcpProvider, ragProvider);
         assertThat(chatClient).isNotNull();
     }
 
@@ -891,8 +903,10 @@ class AgentConfigurationTest {
         ChatModel chatModel = mock(ChatModel.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider = mock(ObjectProvider.class);
-        ChatClient client1 = config.chatClient(chatModel, mcpProvider);
-        ChatClient client2 = config.chatClient(chatModel, mcpProvider);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor> ragProvider = mock(ObjectProvider.class);
+        ChatClient client1 = config.chatClient(chatModel, mcpProvider, ragProvider);
+        ChatClient client2 = config.chatClient(chatModel, mcpProvider, ragProvider);
         assertThat(client1).isNotSameAs(client2);
     }
 
@@ -906,8 +920,10 @@ class AgentConfigurationTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(dummy);
         @SuppressWarnings("unchecked")
         ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider = mock(ObjectProvider.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor> ragProvider = mock(ObjectProvider.class);
         AgentConfiguration config = new AgentConfiguration();
-        ChatClient chatClient = config.chatClient(chatModel, mcpProvider);
+        ChatClient chatClient = config.chatClient(chatModel, mcpProvider, ragProvider);
         chatClient.prompt().user("Hello").advisors(a -> a.param(org.springframework.ai.chat.memory.ChatMemory.CONVERSATION_ID, "test-1")).call().content();
         ArgumentCaptor<Prompt> captor = ArgumentCaptor.forClass(Prompt.class);
         verify(chatModel).call(captor.capture());
@@ -1112,7 +1128,7 @@ Vision via `UserMessage.builder().media(Media.builder()...)`:
 # run /model minicpm-v4.6 first; Linux/CI gemma4:e4b does vision natively.
 ```
 
-### 9.4 Model Switching — `/model` (Step 9)
+### 9.3 Model Switching — `/model` (Step 9)
 
 Per-call model override via `OllamaChatOptions.model(String)`:
 
@@ -1122,7 +1138,7 @@ Per-call model override via `OllamaChatOptions.model(String)`:
 /model reset      # back to configured default
 ```
 
-### 9.5 RAG + PgVector (Step 10)
+### 9.4 RAG + PgVector (Step 10)
 
 ETL in `rag/IngestionService` (TextReader → TokenTextSplitter → VectorStore.add), retrieval as `QuestionAnswerAdvisor` wired in `RagConfiguration` – gated behind `rag.enabled=true` exactly like the MCP client:
 
@@ -1135,7 +1151,7 @@ cd spring-ai-cli-agent && mvn spring-boot:run \
 
 Backend parity: root `com.example.edge.ChatService` exposes chat/chatStream/**ragChat** (`POST /edge/ragChat/{chatId}`); without a VectorStore bean it falls back to plain memory-backed chat.
 
-### 9.6 Observability (Step 14)
+### 9.5 Observability (Step 14)
 
 Micrometer observation of ChatModel calls is native in Spring AI 2.0.0 (there is no separate `ObservationAdvisor` class) – the CLI exposes it via JMX (non-web Spring Shell):
 
@@ -1143,7 +1159,7 @@ Micrometer observation of ChatModel calls is native in Spring AI 2.0.0 (there is
 Metrics (CLI) are exposed via JMX (`spring.jmx.enabled=true`); view `gen_ai.client.token.usage` with `jconsole`.
 ```
 
-### 9.7 Testcontainers (Step 15)
+### 9.6 Testcontainers (Step 15)
 
 `pom.xml` now carries `spring-ai-spring-boot-testcontainers` + `org.testcontainers:ollama` (+ junit-jupiter/postgresql). Two Docker-gated tests stay out of default runs:
 
@@ -1159,42 +1175,53 @@ mvn test -Dtc.pgvector=true  # RagConfiguration against real pgvector/pgvector:p
 
 ```
 spring-ai-cli-agent/
-├── pom.xml
+├── pom.xml                                   # Boot 4.1.0, Spring AI 2.0.0 (see Complete pom.xml)
 ├── src/main/java/com/example/cliai/
 │   ├── Application.java
 │   ├── agent/
 │   │   ├── AgentConfiguration.java
+│   │   ├── SystemPrompts.java                # SYSTEM_TEMPLATE with {role} placeholder
 │   │   ├── UserVisibleToolCallback.java  # pure trace embellishment
 │   │   └── tools/
 │   │       ├── SandboxedGlobTool.java
-│   │       └── SandboxedGrepTool.java
-│   └── cli/
-│       ├── ChatLoop.java
-│       ├── SlashCommand.java              # command pattern interface for /help, /tools, etc.
-│       └── SlashCommandHandler.java       # registry for all slash commands
+│   │       └── SandboxedGrepTool.java        # FileSystemTools/GlobTool/GrepTool come from spring-ai-agent-utils:0.10.0
+│   ├── cli/
+│   │   ├── ChatLoop.java                     # Spring Shell @Command(value="chat"), processLine(), streamAndPrint()
+│   │   ├── SlashCommand.java              # command pattern interface for /help, /tools, etc.
+│   │   └── SlashCommandHandler.java       # registry for all slash commands
+│   └── rag/
+│       ├── IngestionService.java
+│       └── RagConfiguration.java             # gated behind rag.enabled=true
 ├── src/main/resources/
-│   └── application.properties
+│   └── application.properties                # default gemma4:e4b-mlx; CI pins gemma4:e4b
 └── src/test/java/com/example/cliai/
     ├── agent/
     │   ├── AgentConfigurationTest.java
     │   ├── UserVisibleToolCallbackTest.java
-    │   ├── CommandLineQuestionHandlerTest.java  # verifies handler spec: header≤12, options 2-4, multiSelect, free-text
+    │   ├── CommandLineQuestionHandlerTest.java
     │   └── tools/
-    │       ├── FileSystemToolsTest.java
-    │       ├── GlobToolTest.java
-    │       ├── GrepToolTest.java
-    │       └── ToolWiringTest.java
-    └── cli/
-        ├── ChatLoopTest.java
-        ├── ChatClientIntegrationTest.java   # needs Ollama gemma4:e4b-mlx (or lfm2.5)
-        └── ToolCallingEvalTest.java         # -Devals=true, confirms handler was *used* via mocked System.in + trace
+    │       ├── FileSystemToolsTest.java      # 8 tests
+    │       ├── GlobToolTest.java             # 6 tests
+    │       ├── GrepToolTest.java             # 6 tests
+    │       └── ToolWiringTest.java           # 2 tests
+    ├── cli/
+    │   ├── ChatLoopTest.java
+    │   ├── ChatLoopArgsTest.java
+    │   ├── ChatClientIntegrationTest.java   # needs Ollama gemma4:e4b-mlx
+    │   ├── ConfigPropertiesTest.java
+    │   ├── SlashCommandHandlerTest.java
+    │   ├── OllamaContainerIntegrationTest.java  # -Dtc.ollama=true (Docker)
+    │   └── ToolCallingEvalTest.java         # -Devals=true, confirms handler was *used* via mocked System.in + trace
+    └── rag/
+        ├── IngestionServiceTest.java
+        └── RagConfigurationTest.java         # -Dtc.pgvector=true (Docker)
 ```
 
 ---
 
 ## Complete pom.xml
 
-> Matches `spring-ai-cli-agent/pom.xml` – use this as final state if you followed Steps 1, 3.1, 8.1 incrementally:
+> Matches `spring-ai-cli-agent/pom.xml` (Boot 4.1.0, Spring AI 2.0.0) – use this as final state if you followed Steps 1, 3.1, 8.1 incrementally. Step 1's starter pom uses the same Boot 4.1.0 parent; the RAG/Shell/actuator/testcontainers deps below arrive in Steps 9–11/14–15:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1244,13 +1271,55 @@ spring-ai-cli-agent/
             <artifactId>spring-ai-starter-mcp-client</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-pgvector-store</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-vector-store-advisor</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springaicommunity</groupId>
             <artifactId>spring-ai-agent-utils</artifactId>
             <version>0.10.0</version>
         </dependency>
         <dependency>
+            <groupId>org.springframework.shell</groupId>
+            <artifactId>spring-shell-starter</artifactId>
+            <version>4.0.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.shell</groupId>
+            <artifactId>spring-shell-jline</artifactId>
+            <version>4.0.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>ollama</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -1313,7 +1382,9 @@ import org.springframework.context.annotation.Configuration;
 class AgentConfiguration {
 
     @Bean
-    ChatClient chatClient(ChatModel chatModel, ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider) {
+    ChatClient chatClient(ChatModel chatModel,
+                          ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider,
+                          ObjectProvider<org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor> ragAdvisor) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
             .maxMessages(20)
             .build();
@@ -1400,11 +1471,11 @@ These wrapper classes enforce `allowedDirectory` restrictions on `GlobTool` and 
 
 ---
 
-## Complete ChatLoop.java
+## Complete ChatLoop.java (Spring Shell — current)
 
-> The checked-in `ChatLoop.java` is the streaming variant (Step 10 is already applied). It uses `UUID` session IDs, `/help`/`/tools`/`/clear` commands, and `stream().content().doOnNext().blockLast()` for token streaming. If you followed Steps 1-6 literally you have the simpler `call().content()` loop – replace it with this complete file to match the repo:
+> The checked-in `ChatLoop.java` is a Spring Shell component (`@Component`, `@Command(value="chat")`), not a `CommandLineRunner`. It injects `Terminal` only and builds the JLine `LineReader` locally inside `chat()` (avoids the `lineReader → commandCompleter → commandRegistry` cycle), exposes testable `processLine(String)`, streams via `stream().chatResponse()` with cyan `[Thinking]` / green `AI:` output, and supports `/image` vision plus `/role`/`/temp`/`/model` overrides. See `src/main/java/com/example/cliai/cli/ChatLoop.java`.
 >
-> **Note (2026-08)**: The code below shows the pre-Spring-Shell Scanner/CommandLineRunner design. The current `ChatLoop.java` uses Spring Shell (`@Command(value="chat")`) with JLine terminal integration. The core streaming logic (`streamAndPrint`) and slash commands are preserved but routed through the terminal writer for TTY-aware output. The app now runs as a non-web application (`spring.main.web-application-type=none`).
+> The `Scanner`/`CommandLineRunner` loop below is the pre-Shell design (Steps 1–6 era) kept as a minimal reference. Do not copy it over the checked-in file — the streaming/slash-command logic lives in `processLine()`/`streamAndPrint()` routed through the terminal writer.
 
 ```java
 package com.example.cliai.cli;
@@ -1524,13 +1595,11 @@ class ChatLoop implements CommandLineRunner {
 
 ## Next Steps
 
-After completing this tutorial:
+After completing this tutorial (Steps 1–11 cover chat, memory, QnA, file tools, logging, packaging, tests, streaming, RAG, MCP, and enterprise backend):
 
-- **Streaming** — use `.stream()` instead of `.call()` for real-time output
-- **RAG** — add document retrieval with vector stores
-- **MCP** — connect to external tool servers
-- **Multi-model** — route different tasks to different models
 - **Subagent orchestration** — delegate tasks to specialized agents
+- **Multi-model routing** — route different tasks to different models via `/model`
+- **Production hardening** — JMX metrics, pgvector persistence, native image
 
 ---
 
