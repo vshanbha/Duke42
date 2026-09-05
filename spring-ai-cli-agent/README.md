@@ -54,7 +54,7 @@ spring-ai-cli-agent/
 ├── src/main/resources/
 │   ├── application.properties         # Ollama config (checked-in default: gemma4:e4b-mlx)
 │   └── application-local.properties   # local Mac MLX override (git-ignored; not committed, example only)
-└── src/test/java/                    # 58 tests (53 run + 5 skipped: 3 evals + 2 Docker-gated)
+└── src/test/java/                    # 63 tests (58 run + 5 skipped: 3 evals + 2 Docker-gated)
 ```
 
 ## Run Tests
@@ -69,7 +69,7 @@ mvn test -pl spring-ai-cli-agent -am # only CLI agent
 From `spring-ai-cli-agent/`:
 
 ```bash
-mvn test # 58 tests, 3 evals skipped without Ollama + 2 Docker-gated opt-ins
+mvn test # 63 tests, 3 evals skipped without Ollama + 2 Docker-gated opt-ins
 mvn test -Devals=true # opt-in model/tool-call evals, requires Ollama gemma4:e4b-mlx (or gemma4:e4b via -Dspring.ai.ollama.chat.model=gemma4:e4b)
 ```
 
