@@ -60,13 +60,15 @@ Duke42/
 │   │   │       ├── GlobTool.java
 │   │   │       └── GrepTool.java
 │   │   ├── cli/
-│   │   │   ├── ChatLoop.java                # streaming + thinking + SlashCommandHandler
+│   │   │   ├── ChatLoop.java                # Spring Shell @Command chat loop, streaming + thinking
+│   │   │   ├── ChatAutoStarter.java         # auto-enters chat on interactive startup (chat.auto-start=false disables)
+│   │   │   ├── AgentPromptProvider.java     # agent> shell prompt
 │   │   │   ├── SlashCommand.java            # command pattern interface
 │   │   │   └── SlashCommandHandler.java     # registry /help,/tools,/clear,/think,/exit
 │   │   └── rag/
 │   │       ├── RagConfiguration.java        # VectorStore + EmbeddingModel + ETL
 │   │       └── IngestionService.java
-│   └── src/test/java/             # 58 tests (53 run + 5 skipped: 3 evals + 2 Docker-gated)
+│   └── src/test/java/             # 68 tests (63 run + 5 skipped: 3 evals + 2 Docker-gated)
 │
 ├── backend/                       # Enterprise demo (Vaadin + REST + GraphQL + MCP)
 │   ├── pom.xml
@@ -124,7 +126,7 @@ Duke42/
 
 **What you'll build**: CLI loop `You: → AI:` via `ChatClient` (no memory/tools).
 
-**Key files**: `pom.xml` (`spring-ai-starter-model-ollama` via `spring-ai-bom:2.0.0`), `application.properties` (`spring.ai.ollama.base-url`, `spring.ai.ollama.chat.model=gemma4:e4b`), `Application.java`, `AgentConfiguration.java` (`ChatClient.builder(chatModel).build()`), `ChatLoop.java` (simple `Scanner` loop, later: `SlashCommandHandler`).
+**Key files**: `pom.xml` (`spring-ai-starter-model-ollama` via `spring-ai-bom:2.0.0`), `application.properties` (`spring.ai.ollama.base-url`, `spring.ai.ollama.chat.model=gemma4:e4b-mlx`, CI pins `gemma4:e4b`), `Application.java`, `AgentConfiguration.java` (`ChatClient.builder(chatModel).build()`), `ChatLoop.java` (simple `Scanner` loop, later: `SlashCommandHandler`).
 
 **Verify**: `mvn spring-boot:run` → `What is 2+2?`
 
@@ -240,7 +242,7 @@ Duke42/
 
 **What you'll build**: `pom.xml` `spring-ai-spring-boot-testcontainers:2.0.0` + `testcontainers:ollama` (test scope, already added), `ChatClientIntegrationTest` with `OllamaContainer` `@ServiceConnection`, `ToolCallingEvalTest` (`-Devals=true`) as `LLM-as-a-Judge` (trace contains `[Tool] AskUserQuestionTool`).
 
-**Verify**: `mvn test` (mocked, no Ollama) → 58 tests; `mvn test -Devals=true` (real `gemma4:e4b-mlx`) → 3 evals PASS; `mvn test -Dmcp.integration=true` (polyglot `9000`).
+**Verify**: `mvn test` (mocked, no Ollama) → 68 tests; `mvn test -Devals=true` (real `gemma4:e4b-mlx`) → 3 evals PASS; `mvn test -Dmcp.integration=true` (polyglot `9000`).
 
 ---
 
@@ -264,7 +266,7 @@ After all 15 steps, the project has:
 | Thinking | OllamaChatOptions.enableThinking(), reasoningContent | `ollama-chat.html#_thinking_mode_reasoning` |
 | Observability | Micrometer | `observability/index.html` |
 | Dev-time Services | Docker Compose, Testcontainers | `docker-compose.html`, `testcontainers.html` |
-| Packaging + Tests | Executable jar, 58 tests + evals | `spring-boot:run`, `testcontainers.html`, `testing/evaluation` |
+| Packaging + Tests | Executable jar, 68 tests + evals | `spring-boot:run`, `testcontainers.html`, `testing/evaluation` |
 
 ### `pom.xml` (complete, CLI)
 

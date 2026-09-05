@@ -19,14 +19,16 @@ ollama pull gemma4:e4b-mlx # default; CI uses gemma4:e4b via -Dspring.ai.ollama.
 # Native Ollama thinking: spring.ai.ollama.chat.think=medium in application.properties
 
 # Run (default model is gemma4:e4b-mlx; CI overrides to gemma4:e4b via -D)
+# Lands directly at the You: prompt (auto-enter chat); 'exit' returns to the
+# agent> shell prompt, where chat re-enters and exit quits
 mvn spring-boot:run
 
 # Chat
-You: What is (15 * 7) + 23?
-AI: The answer is 128.
+You: Read the pom.xml file
+AI: [shows pom content via FileSystemTools]
 
-You: Convert 100 km to miles
-AI: 100 km is 62.14 miles.
+You: Find all Java files in this project
+AI: [lists files via GlobTool]
 
 You: My name is Alice
 AI: Nice to meet you, Alice!
@@ -48,13 +50,15 @@ spring-ai-cli-agent/
 │   │       ├── SandboxedGlobTool.java  # Sandbox wrapper for GlobTool
 │   │       └── SandboxedGrepTool.java  # Sandbox wrapper for GrepTool
 │   └── cli/
-│       ├── ChatLoop.java             # Terminal REPL
+│       ├── ChatLoop.java             # Spring Shell @Command chat loop, streaming + thinking
+│       ├── ChatAutoStarter.java      # auto-enters chat on interactive startup (chat.auto-start=false disables)
+│       ├── AgentPromptProvider.java  # agent> shell prompt
 │       ├── SlashCommand.java         # command pattern interface
 │       └── SlashCommandHandler.java  # registry for /help, /tools, /clear, /think, /exit
 ├── src/main/resources/
 │   ├── application.properties         # Ollama config (checked-in default: gemma4:e4b-mlx)
 │   └── application-local.properties   # local Mac MLX override (git-ignored; not committed, example only)
-└── src/test/java/                    # 58 tests (53 run + 5 skipped: 3 evals + 2 Docker-gated)
+└── src/test/java/                    # 68 tests (63 run + 5 skipped: 3 evals + 2 Docker-gated)
 ```
 
 ## Run Tests
@@ -62,14 +66,14 @@ spring-ai-cli-agent/
 From top level (`Duke42/`):
 
 ```bash
-mvn test # all modules (spring-ai-cli-agent 58 + backend 14)
+mvn test # all modules (spring-ai-cli-agent 68 + backend 14)
 mvn test -pl spring-ai-cli-agent -am # only CLI agent
 ```
 
 From `spring-ai-cli-agent/`:
 
 ```bash
-mvn test # 58 tests, 3 evals skipped without Ollama + 2 Docker-gated opt-ins
+mvn test # 68 tests, 3 evals skipped without Ollama + 2 Docker-gated opt-ins
 mvn test -Devals=true # opt-in model/tool-call evals, requires Ollama gemma4:e4b-mlx (or gemma4:e4b via -Dspring.ai.ollama.chat.model=gemma4:e4b)
 ```
 

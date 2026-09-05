@@ -31,7 +31,7 @@ A complete learning project that teaches Spring AI concepts step by step:
 5. Multiple tool calling flow
 6. SimpleLoggerAdvisor for debugging
 7. Executable jar packaging
-8. Unit tests (58 tests: FileSystemTools, GlobTool, GrepTool, SandboxedGlobTool, SandboxedGrepTool, AgentConfiguration, ChatLoop)
+8. Unit tests (68 tests: FileSystemTools, GlobTool, GrepTool, SandboxedGlobTool, SandboxedGrepTool, AgentConfiguration, ChatLoop, shell startup)
 
 ---
 
@@ -110,7 +110,7 @@ The tutorial maps to sections in the Baeldung article:
 ### Prerequisites
 - Java 17+ (Spring AI 2.0 requirement)
 - Maven 3.6+
-- Ollama CLI with models: `lfm2.5`, `qwen2.5`, `llama3.1`, `mistral`
+- Ollama CLI with model `gemma4:e4b-mlx` (default; CI pins `gemma4:e4b`) — smaller alternative `lfm2.5`
 
 ### Run the Agent
 ```bash
@@ -143,7 +143,7 @@ java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 ```bash
 cd spring-ai-cli-agent
 mvn test
-# 58 tests covering FileSystemTools, GlobTool, GrepTool, SandboxedGlobTool, SandboxedGrepTool, AgentConfiguration, ChatLoop
+# 68 tests covering FileSystemTools, GlobTool, GrepTool, SandboxedGlobTool, SandboxedGrepTool, AgentConfiguration, ChatLoop
 ```
 
 ---
