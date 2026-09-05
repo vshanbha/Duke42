@@ -79,7 +79,6 @@ final class SlashCommandHandler {
             System.out.println("  /model   Show/switch chat model via ChatOptions");
             System.out.println("  /temp    Show/set sampling temperature (ChatOptions)");
             System.out.println("  /image   <path> <question> - ask about an image (multimodality)");
-            System.out.println("  /convert <value> <from> <to> - structured output conversion");
             System.out.println("  /exit    Exit the CLI");
             System.out.println("  exit     Exit the CLI\n");
             return Result.HANDLED;
@@ -92,8 +91,9 @@ final class SlashCommandHandler {
         @Override public boolean supports(String input) { return "/tools".equalsIgnoreCase(input.trim()); }
         @Override public Result execute(String input, Context context) {
             System.out.println("\nAvailable tools:");
-            System.out.println("  CalculatorTool      Evaluate mathematical expressions");
-            System.out.println("  UnitConverterTool   Convert supported units");
+            System.out.println("  FileSystemTools    Read, write, and edit files (project-sandboxed)");
+            System.out.println("  GlobTool           Find files by glob pattern");
+            System.out.println("  GrepTool           Search file contents by regex");
             System.out.println("  AskUserQuestionTool Let the agent ask a clarifying question\n");
             return Result.HANDLED;
         }

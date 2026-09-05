@@ -29,19 +29,19 @@ class ToolCallingEvalTest {
     ChatClient chatClient;
 
     @Test
-    void calculatorPromptMustExecuteCalculatorTool() {
+    void globPromptMustExecuteGlobTool() {
         PrintStream originalOut = System.out;
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try {
             System.setOut(new PrintStream(output));
             String response = chatClient.prompt()
-                .user("Use the calculator tool to evaluate exactly (15 * 7) + 23. Do not calculate it yourself.")
+                .user("Use the Glob tool to find all Java files matching **/*.java in the current directory. Do not answer from memory.")
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "eval-" + UUID.randomUUID()))
                 .call()
                 .content();
 
             String trace = output.toString(StandardCharsets.UTF_8);
-            assertThat(trace).contains("[Tool] calculate", "[Tool result] 128.0");
+            assertThat(trace).contains("[Tool] Glob", "[Tool result]");
             assertThat(response).isNotBlank();
         }
         finally {

@@ -11,3 +11,4 @@ Index of all agent sessions and work done.
 | 2026-08-26 | [Session 5](worklog/2026-08-26-session-5.md) | Blueprint execution: Structured Output, Multimodality, Model switching, RAG+PgVector, Observability, Testcontainers, backend ragChat |
 | 2026-08-26 | [Session 6](worklog/2026-08-26-session-6.md) | softwareaifactory.sh installed (java pack): gates, roles, proofs, Maven check_command, CI factory-gates job |
 | 2026-08-31 | [Session 7](worklog/2026-08-31-session-7.md) | Spring Shell REPL migration, JMX observability, deprecated key cleanup, 5-round adversarial review |
+| 2026-08-31 | [Session 8](worklog/2026-08-31-session-8.md) | Issue #9: Replace CalculatorTool/UnitConverterTool with FileSystemTools + GlobTool + GrepTool |
