@@ -45,7 +45,7 @@ cd backend && mvn test -Dmcp.integration=true # or mvn test -Dmcp.integration=tr
 
 | Module | Purpose | Port | Tests |
 |--------|---------|------|-------|
-| `spring-ai-cli-agent/` | CLI Agent learning project | non-web | 64 (63 run + 5 skipped: 3 evals + 2 Docker-gated opt-ins) |
+| `spring-ai-cli-agent/` | CLI Agent learning project | non-web | 68 (63 run + 5 skipped: 3 evals + 2 Docker-gated opt-ins) |
 | `backend/` | Enterprise demo (Vaadin + REST + GraphQL + MCP) | 8080 | 14 (10 unit + 4 e2e via failsafe) |
 | `polyglot/` | GraalVM Python integration (MCP server) | 9000 | 3 (integration) |
 | `ui/` | Legacy JavaFX desktop client (optional, not in parent build) | — | — |

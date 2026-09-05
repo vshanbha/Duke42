@@ -7,6 +7,7 @@
 **Constraints**: Under 10 GB download, tools + thinking support, no cloud dependency
 **Stack**: Spring Boot + Spring AI + Ollama (local, free, private)
 **Default**: `lfm2.5` (5.2 GB, fastest, MoE 8B/1B active, 125K). Alternatives under 10 GB: `qwen3.5:9b` (6.6 GB, 256K) and `gemma4:e4b` (9.6 GB, vision+audio) — both with `tools`.
+> CLI agent note: the checked-in `spring-ai-cli-agent` default is `gemma4:e4b-mlx` (Mac MLX; CI pins `gemma4:e4b`), with `lfm2.5` as the smaller edge alternative above.
 
 ---
 
