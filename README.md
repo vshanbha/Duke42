@@ -41,7 +41,7 @@ Duke42 has two sides: a **learning path** (Spring AI CLI Agent) and an **enterpr
 - **Web UI**: Vaadin chat interface for enterprise demos
 - **REST API**: For JavaScript/React developers
 - **GraphQL**: Flexible query layer for JS/React clients
-- **Tested**: 62 tests (58 CLI + 14 backend)
+- **Tested**: 77 tests (63 CLI + 14 backend)
 
 ---
 

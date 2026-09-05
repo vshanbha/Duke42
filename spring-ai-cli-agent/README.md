@@ -62,7 +62,7 @@ spring-ai-cli-agent/
 From top level (`Duke42/`):
 
 ```bash
-mvn test # all modules (spring-ai-cli-agent 58 + backend 14)
+mvn test # all modules (spring-ai-cli-agent 63 + backend 14)
 mvn test -pl spring-ai-cli-agent -am # only CLI agent
 ```
 
