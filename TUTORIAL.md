@@ -1879,7 +1879,7 @@ System.out.println();
 
 ### Models
 
-- [lfm2.5](https://ollama.com/library/lfm2.5) — 8B MoE (1B active, 5.2 GB) with tool calling — default
+- [lfm2.5](https://ollama.com/library/lfm2.5) — 8B MoE (1B active, 5.2 GB) with tool calling — smaller alternative to the default
 - [qwen3.5:9b](https://ollama.com/library/qwen3.5) — 9B alternative (6.6 GB, 256K, tools+thinking)
 - [gemma4:e4b](https://ollama.com/library/gemma4) — 4.5B effective multimodal (9.6 GB, tools+thinking+vision+audio)
 - Full comparison of $<10$ GB tools-capable models: [`ollama-model-links.md`](ollama-model-links.md) — single source of truth
