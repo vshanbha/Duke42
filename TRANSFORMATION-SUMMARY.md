@@ -27,11 +27,11 @@ A complete learning project that teaches Spring AI concepts step by step:
 1. ChatClient with Ollama integration
 2. Chat memory with Advisors
 3. AskUserQuestionTool for interactive Q&A
-4. Custom tools (CalculatorTool, UnitConverterTool)
+4. File system tools (FileSystemTools, GlobTool, GrepTool)
 5. Multiple tool calling flow
 6. SimpleLoggerAdvisor for debugging
 7. Executable jar packaging
-8. Unit tests (29 tests: CalculatorTool, UnitConverterTool, AgentConfiguration, ChatLoop)
+8. Unit tests (58 tests: FileSystemTools, GlobTool, GrepTool, SandboxedGlobTool, SandboxedGrepTool, AgentConfiguration, ChatLoop)
 
 ---
 
@@ -143,7 +143,7 @@ java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 ```bash
 cd spring-ai-cli-agent
 mvn test
-# 29 tests covering CalculatorTool, UnitConverterTool, AgentConfiguration, ChatLoop
+# 58 tests covering FileSystemTools, GlobTool, GrepTool, SandboxedGlobTool, SandboxedGrepTool, AgentConfiguration, ChatLoop
 ```
 
 ---

@@ -98,6 +98,6 @@ class SlashCommandHandlerTest {
         handler.handle("/help", context);
         String help = stdout();
         assertThat(help).contains("/role").contains("/model").contains("/temp")
-            .contains("/image").contains("/convert");
+            .contains("/image");
     }
 }

@@ -1,7 +1,10 @@
 package com.example.cliai.agent;
 
-import com.example.cliai.agent.tools.CalculatorTool;
-import com.example.cliai.agent.tools.UnitConverterTool;
+import org.springaicommunity.agent.tools.FileSystemTools;
+import org.springaicommunity.agent.tools.GlobTool;
+import org.springaicommunity.agent.tools.GrepTool;
+import com.example.cliai.agent.tools.SandboxedGlobTool;
+import com.example.cliai.agent.tools.SandboxedGrepTool;
 import org.springaicommunity.agent.tools.AskUserQuestionTool;
 import org.springaicommunity.agent.utils.CommandLineQuestionHandler;
 import org.springframework.ai.chat.client.ChatClient;
@@ -37,8 +40,16 @@ class AgentConfiguration {
             .build();
 
         // Visibility embellishment for all tools (including QnA) – pure trace, no definition mutation or spec decoration
+        // Sandbox is rooted at the JVM working directory — app must be launched from the project root
+        java.nio.file.Path projectRoot = java.nio.file.Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        FileSystemTools fileSystemTools = FileSystemTools.builder()
+            .allowedDirectory(projectRoot).build();
+        GlobTool globTool = GlobTool.builder().workingDirectory(projectRoot).build();
+        GrepTool grepTool = GrepTool.builder().workingDirectory(projectRoot).build();
+        SandboxedGlobTool sandboxedGlob = new SandboxedGlobTool(globTool, projectRoot);
+        SandboxedGrepTool sandboxedGrep = new SandboxedGrepTool(grepTool, projectRoot);
         ToolCallback[] allWithTrace = java.util.Arrays.stream(
-                ToolCallbacks.from(askUserQuestionTool, new CalculatorTool(), new UnitConverterTool()))
+                ToolCallbacks.from(askUserQuestionTool, fileSystemTools, sandboxedGlob, sandboxedGrep))
             .map(UserVisibleToolCallback::new)
             .toArray(ToolCallback[]::new);
 

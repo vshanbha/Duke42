@@ -81,24 +81,26 @@ mvn spring-boot:run
 # Answer questions — AI will tailor response
 ```
 
-### Workshop 4: Custom Tool (2 hours)
-**Concept**: Build your own tools by implementing a method annotated with `@Tool`. The AI decides when to call based on the tool's description.
+### Workshop 4: File System Tools (2 hours)
+**Concept**: Use pre-built tools from `spring-ai-agent-utils` for file system operations. The AI decides when to call based on the tool's description.
 
 **Learning Outcomes**:
-- Create CalculatorTool with @Tool annotation
-- Use @ToolParam for parameter descriptions
-- Register custom tools in ChatClient
-- Understand AI tool selection
+- Understand FileSystemTools (read/write/edit with sandboxing)
+- Understand GlobTool (find files by pattern)
+- Understand GrepTool (search file contents by regex)
+- Register tools in ChatClient
 
 **Key Files**:
-- `CalculatorTool.java` with @Tool annotation
+- `FileSystemTools.java`, `GlobTool.java`, `GrepTool.java` from spring-ai-agent-utils
 - Updated AgentConfiguration with tool registration
 
 **Verification**:
 ```bash
 mvn spring-boot:run
-# Type: What is (15 * 7) + 23?
-# AI should call calculator tool and give answer
+# Type: Find all Java files in this project
+# AI should call GlobTool
+# Type: Search for @Tool annotations in the codebase
+# AI should call GrepTool
 ```
 
 ---
@@ -109,24 +111,24 @@ mvn spring-boot:run
 **Concept**: When multiple tools are registered, the AI picks the right one based on the user's request. It can even call multiple tools in sequence.
 
 **Learning Outcomes**:
-- Create UnitConverterTool for unit conversions
+- Use FileSystemTools for read/write/edit operations
 - Observe AI choosing between tools
 - Test sequential tool calling
 - Understand tool selection logic
 
 **Key Files**:
-- `UnitConverterTool.java` with @Tool annotation
+- FileSystemTools, GlobTool, GrepTool from spring-ai-agent-utils
 - Updated AgentConfiguration with multiple tools
 
 **Verification**:
 ```bash
 mvn spring-boot:run
-# Type: Convert 100 km to miles
-# AI calls UnitConverterTool
-# Type: What is 15 * 7?
-# AI calls CalculatorTool
-# Type: If I drive 100 km at 60 mph, how long does it take in minutes?
-# AI calls both tools in sequence
+# Type: Read the pom.xml file
+# AI calls FileSystemTools.read()
+# Type: Find all test files
+# AI calls GlobTool
+# Type: Search for "ChatClient" in all Java files and show the results
+# AI calls GrepTool
 ```
 
 ### Workshop 6: Advisors — Logging (2 hours)
@@ -189,15 +191,17 @@ java -jar target/spring-ai-cli-agent-0.0.1-SNAPSHOT.jar
 - Verify CLI loop behavior with Mockito
 
 **Key Files**:
-- `CalculatorToolTest.java` — 12 tests for math expressions
-- `UnitConverterToolTest.java` — 12 tests for all conversion paths
-- `AgentConfigurationTest.java` — 2 tests for bean wiring
-- `ChatLoopTest.java` — 3 tests for REPL logic
+- `FileSystemToolsTest.java` — 8 tests for read/write/edit and sandbox security
+- `GlobToolTest.java` — 2 tests for glob pattern matching
+- `GrepToolTest.java` — 2 tests for regex search
+- `ToolWiringTest.java` — 2 tests for tool callback wiring
+- `AgentConfigurationTest.java` — 5 tests for bean wiring
+- `ChatLoopTest.java` — 5 tests for REPL logic
 
 **Verification**:
 ```bash
 mvn test
-# 29 tests should pass
+# 58 tests should pass
 ```
 
 ### Workshop 9: Enterprise Integration Patterns (2 hours)

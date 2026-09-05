@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Pure parsing/mime helpers for the BLUEPRINT Step 7 (/convert) and Step 8 (/image) commands. */
+/** Pure parsing/mime helpers for the /image command. */
 class ChatLoopArgsTest {
 
     @Test
@@ -20,19 +20,6 @@ class ChatLoopArgsTest {
     void parseImageArgsShouldRejectMalformedInput() {
         assertThat(ChatLoop.parseImageArgs("/image")).isNull();
         assertThat(ChatLoop.parseImageArgs("/image /tmp/pic.jpg")).isNull();
-    }
-
-    @Test
-    void parseConvertArgsShouldReturnTriple() {
-        String[] args = ChatLoop.parseConvertArgs("/convert 100 km miles");
-
-        assertThat(args).containsExactly("100", "km", "miles");
-    }
-
-    @Test
-    void parseConvertArgsShouldRejectBadInput() {
-        assertThat(ChatLoop.parseConvertArgs("/convert 100 km")).isNull();
-        assertThat(ChatLoop.parseConvertArgs("/convert abc km miles")).isNull();
     }
 
     @Test
