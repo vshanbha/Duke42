@@ -1221,7 +1221,7 @@ spring-ai-cli-agent/
 
 ## Complete pom.xml
 
-> Matches `spring-ai-cli-agent/pom.xml` (Boot 4.1.0, Spring AI 2.0.0) – use this as final state if you followed Steps 1, 3.1, 8.1 incrementally. Step 1's starter pom uses the same Boot 4.1.0 parent; the RAG/Shell/actuator/testcontainers deps below arrive in Steps 9–11/14–15:
+> Matches `spring-ai-cli-agent/pom.xml` in dependencies (Boot 4.1.0, Spring AI 2.0.0; comments and the `testcontainers-ollama.version` property abbreviated) – use this as final state if you followed Steps 1, 3.1, 8.1 incrementally. Step 1's starter pom uses the same Boot 4.1.0 parent; the RAG/Shell/actuator/testcontainers deps below arrive in Steps 9–11/14–15. For byte-identical build config see the checked-in pom (it pins `testcontainers-ollama.version=1.21.3` via a `<properties>` block):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1365,10 +1365,9 @@ spring.ai.ollama.chat.model=gemma4:e4b-mlx
 ```java
 package com.example.cliai.agent;
 
-import com.example.cliai.agent.tools.SandboxedGlobTool;
-import com.example.cliai.agent.tools.SandboxedGrepTool;
-import org.springaicommunity.agent.tools.AskUserQuestionTool;
-import org.springaicommunity.agent.utils.CommandLineQuestionHandler;
+// Imports abbreviated — see src/main/java/com/example/cliai/agent/AgentConfiguration.java for the full list
+// (FileSystemTools, GlobTool, GrepTool, AskUserQuestionTool, ToolCallbacks, ToolCallback,
+// SyncMcpToolCallbackProvider, ObjectProvider, QuestionAnswerAdvisor).
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -1384,6 +1383,7 @@ class AgentConfiguration {
     @Bean
     ChatClient chatClient(ChatModel chatModel,
                           ObjectProvider<SyncMcpToolCallbackProvider> mcpProvider,
+                          // FQ for brevity — the repo imports QuestionAnswerAdvisor normally
                           ObjectProvider<org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor> ragAdvisor) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
             .maxMessages(20)
@@ -1585,7 +1585,7 @@ class ChatLoop implements CommandLineRunner {
 | Issue | Fix |
 |-------|-----|
 | `Connection refused` on Ollama | Run `ollama serve` first |
-| Tool calling doesn't work | Use a model with `tools` support — `lfm2.5` (default, 5.2 GB), `qwen3.5:9b` (6.6 GB) or `gemma4:e4b` (9.6 GB). See [`ollama-model-links.md`](ollama-model-links.md) for the full $<10$ GB comparison |
+| Tool calling doesn't work | Use a model with `tools` support — `gemma4:e4b-mlx` (default) or `gemma4:e4b` (CI/Linux, 9.6 GB), `lfm2.5` (5.2 GB smaller alt) or `qwen3.5:9b` (6.6 GB). See [`ollama-model-links.md`](ollama-model-links.md) for the full $<10$ GB comparison |
 | Model asks clarifying question in plain text, never triggers `AskUserQuestionTool` | QnA not registered as separate first-class tool per blog/docs – ensure `AskUserQuestionTool.builder().questionHandler(new CommandLineQuestionHandler()).build()` is registered (tutorial 3.2, production `qnaCallbacks`/`domainCallbacks` in 3.3) and `defaultSystem` contains `use an available tool to ask - never ask in ordinary assistant text` (tool-oblivious nudge) |
 | Slow first response | Ollama loads the model into RAM on first call; subsequent calls are fast |
 | `OutOfMemoryError` | Use a smaller model: `ollama pull lfm2.5` or `qwen3.5:4b` (3.4 GB) |
