@@ -239,9 +239,13 @@ class ChatLoop implements CommandLineRunner {
 
 ```bash
 mvn spring-boot:run
+# Lands directly at the You: prompt (ChatAutoStarter auto-enters chat on interactive terminals)
 # Type: What is 2+2?
 # You should get a response from the LLM
+# Type 'exit' to return to the agent> shell (chat re-enters the loop, exit quits)
 ```
+
+> Startup behavior: `ChatAutoStarter` (an `ApplicationRunner` before Spring Shell's own loop) calls `chat()` when a console is attached and no shell command args were passed. Non-interactive runs (pipes, CI, `java -jar app.jar help`) skip auto-start. Disable with `chat.auto-start=false`. The shell prompt itself is `agent>` (via `AgentPromptProvider`).
 
 ### 1.6 Test Implementation
 
@@ -662,7 +666,7 @@ The jar includes all dependencies and the Spring Boot loader. Anyone with Java 1
 
 ### 7.3 Test Implementation
 
-No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`58 tests` with `gemma4:e4b-mlx`).
+No new test – `mvn package` already runs `mvn test` (skipped here via `-DskipTests` for speed); full suite verified in Step 8.6 (`63 tests` with `gemma4:e4b-mlx`).
 
 ### 7.4 Further Reading
 
@@ -1089,7 +1093,7 @@ Create `UserVisibleToolCallbackTest.java` (pure trace `passesArgumentsThroughUnc
 From top level (`Duke42/`):
 
 ```bash
-mvn test # CLI agent: 58 tests (3 evals skipped – add -Devals=true + Ollama gemma4:e4b-mlx; 2 Docker-gated opt-ins)
+mvn test # CLI agent: 63 tests (3 evals skipped – add -Devals=true + Ollama gemma4:e4b-mlx; 2 Docker-gated opt-ins)
 mvn test -Devals=true # same as above but runs ToolCallingEvalTest 3 with real Ollama model
 mvn test -pl backend # 14 tests
 ```

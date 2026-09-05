@@ -101,7 +101,7 @@ mvn spring-boot:run
 **5. Run tests**
 
 ```bash
-# CLI Agent tests (58 tests; 3 evals need -Devals=true + Ollama,
+# CLI Agent tests (63 tests; 3 evals need -Devals=true + Ollama,
 # 2 Docker-gated: -Dtc.ollama=true / -Dtc.pgvector=true)
 cd spring-ai-cli-agent && mvn test
 
