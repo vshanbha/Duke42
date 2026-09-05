@@ -41,7 +41,7 @@ Duke42 has two sides: a **learning path** (Spring AI CLI Agent) and an **enterpr
 - **Web UI**: Vaadin chat interface for enterprise demos
 - **REST API**: For JavaScript/React developers
 - **GraphQL**: Flexible query layer for JS/React clients
-- **Tested**: 78 tests (64 CLI + 14 backend)
+- **Tested**: 82 tests (68 CLI + 14 backend)
 
 ---
 
@@ -80,6 +80,8 @@ cd duke42
 cd spring-ai-cli-agent
 mvn spring-boot:run
 # Runs as a non-web Spring Shell app (no embedded server)
+# Lands directly at the You: prompt (auto-enter chat); 'exit' returns to the
+# agent> shell prompt, where chat re-enters and exit quits the app
 ```
 
 **3. Run the Enterprise Backend**
@@ -101,7 +103,7 @@ mvn spring-boot:run
 **5. Run tests**
 
 ```bash
-# CLI Agent tests (64 tests; 3 evals need -Devals=true + Ollama,
+# CLI Agent tests (68 tests; 3 evals need -Devals=true + Ollama,
 # 2 Docker-gated: -Dtc.ollama=true / -Dtc.pgvector=true)
 cd spring-ai-cli-agent && mvn test
 
@@ -159,8 +161,8 @@ cd spring-ai-cli-agent && mvn spring-boot:run \
 ### Ollama
 
 - [Ollama Website](https://ollama.com/) — Download and install
-- [lfm2.5 Model](https://ollama.com/library/lfm2.5) — Primary model (5.2 GB) used in tutorial
-- Alternatives $<10$ GB with tools: [qwen3.5:9b](https://ollama.com/library/qwen3.5) (6.6 GB), [gemma4:e4b](https://ollama.com/library/gemma4) (9.6 GB) — see [ollama-model-links.md](ollama-model-links.md) (single source of truth)
+- [gemma4:e4b-mlx Model](https://ollama.com/library/gemma4) — Default (tools+thinking+vision+audio); CI pins `gemma4:e4b`
+- Alternatives $<10$ GB with tools: [qwen3.5:9b](https://ollama.com/library/qwen3.5) (6.6 GB), [lfm2.5 Model](https://ollama.com/library/lfm2.5) (5.2 GB smaller) — see [ollama-model-links.md](ollama-model-links.md) (single source of truth)
 
 ### Vaadin
 
