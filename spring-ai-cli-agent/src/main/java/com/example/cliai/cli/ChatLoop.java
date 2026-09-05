@@ -57,8 +57,7 @@ class ChatLoop {
     /** Spring Shell command: enter the interactive chat loop. */
     @Command(value = "chat", help = "Start an interactive chat session with the agent")
     public void chat() {
-        terminal.writer().println("Spring AI CLI Agent — type 'exit' to leave the chat, Ctrl-D to abort.\n");
-        terminal.writer().flush();
+        printBanner();
         // Build the LineReader locally: the auto-configured LineReader bean participates
         // in a circular dependency with the command registry, so we avoid injecting it.
         LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
@@ -77,6 +76,15 @@ class ChatLoop {
                 return;
             }
         }
+    }
+
+    /**
+     * Print the chat entry banner. Separated for testability (a DumbTerminal
+     * writer does not bridge to a capturable stream, so tests inject a mock).
+     */
+    void printBanner() {
+        terminal.writer().println("Spring AI CLI Agent — chatting directly. Type /help for commands, 'exit' to return to the shell.\n");
+        terminal.writer().flush();
     }
 
     /**
