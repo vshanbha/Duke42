@@ -13,3 +13,4 @@ Index of all agent sessions and work done.
 | 2026-08-31 | [Session 7](worklog/2026-08-31-session-7.md) | Spring Shell REPL migration, JMX observability, deprecated key cleanup, 5-round adversarial review |
 | 2026-08-31 | [Session 8](worklog/2026-08-31-session-8.md) | Issue #9: Replace CalculatorTool/UnitConverterTool with FileSystemTools + GlobTool + GrepTool |
 | 2026-09-05 | [Session 9](worklog/2026-09-05-session-9.md) | Shell auto-enter chat + agent prompt, TUTORIAL sync, PR #13 folded into #12, lessons drained, 4-round reviewer APPROVE |
+| 2026-10-06 | [Session 10](worklog/2026-10-06-session-10.md) | Diagnosed err_aca758e7: migrate factory-hooks plugin to OpenCode V2 API, fix shared-server cwd fail-open, live parity eval |

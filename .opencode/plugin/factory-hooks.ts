@@ -1,50 +1,51 @@
-import type { Plugin } from "@opencode-ai/plugin"
+import { Plugin } from "@opencode/plugin"
 import { execFile, execFileSync } from "node:child_process"
+import { promisify } from "node:util"
 import { join } from "node:path"
 import { existsSync, unlinkSync, writeFileSync } from "node:fs"
 
-export default (async ({ client, project, directory, $ }) => {
-  // Session → agent name map, populated by the chat.message hook.
-  // tool.execute.before has sessionID but not agent; we derive the agent
-  // from the most recent chat.message for that session.
-  // Verified against opencode plugin types (packages/plugin/src/index.ts):
-  //   tool.execute.before input: { tool: string; sessionID: string; callID: string }
-  //   chat.message input: { sessionID: string; agent?: string }
-  const sessionAgents = new Map<string, string>()
+const execFileAsync = promisify(execFile)
 
-  // Record the session-start HEAD for the loop-close check (dispose hook).
-  const flagPath = join(directory, "memory", ".pending-lesson-reminder")
-  let startHead = ""
-  try {
-    startHead = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: directory,
-      encoding: "utf-8",
-      timeout: 3000,
-    }).trim()
-  } catch {
-    // Not a git repo or git unavailable — loop-close check will skip silently.
-  }
+// Duke42 software-factory hooks — OpenCode V2 plugin API.
+// Migrated from the V1 function entrypoint (export default async ({...}) => ({...})),
+// which V2 rejects with "Plugin must export a default definition with an id and
+// an effect or setup function". V2 registers hooks on their owning domain inside
+// setup(); the executing agent is carried on the tool hook event, so the V1
+// chat.message session→agent map is no longer needed.
+export default Plugin.define({
+  id: "factory-hooks",
+  async setup(ctx) {
+    const directory = ctx.location.directory
 
-  return {
-    // Capture the agent name for each session from chat messages.
-    "chat.message": async (input, output) => {
-      if (input.agent) {
-        sessionAgents.set(input.sessionID, input.agent)
-      }
-    },
+    // Loop-close check baseline: HEAD at plugin load, compared at unload time
+    // by scripts/hooks/loop-close-check.sh.
+    const flagPath = join(directory, "memory", ".pending-lesson-reminder")
+    let startHead = ""
+    try {
+      startHead = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: directory,
+        encoding: "utf-8",
+        timeout: 3000,
+      }).trim()
+    } catch {
+      // Not a git repo or git unavailable — loop-close check will skip silently.
+    }
 
-    "tool.execute.before": async (input, output) => {
-      const toolName = input.tool ?? ""
-
-      // Test-edit denial: call the shared shell script.
-      // per ADR-0004 Decision 2: no inline enforcement logic in the plugin.
-      // The script (scripts/hooks/test-edit-denial.sh) is the single source of the rule.
+    // Test-edit denial: call the shared shell script.
+    // per ADR-0004 Decision 2: no inline enforcement logic in the plugin.
+    // The script (scripts/hooks/test-edit-denial.sh) is the single source of the rule.
+    // V2 hook callback: one mutable event; throwing denies the tool call.
+    await ctx.tool.hook("execute.before", async (event) => {
+      const toolName = event.tool
       if (toolName === "edit" || toolName === "write") {
-        const filePath = output?.args?.filePath ?? output?.args?.path ?? ""
+        // event.input is `unknown` in ToolHooks — guard before property access.
+        const raw = typeof event.input === "object" && event.input !== null ? event.input : {}
+        const input = raw as { filePath?: string; path?: string }
+        const filePath = input.filePath ?? input.path ?? ""
 
-        // Derive the agent role from the session's agent name.
-        const agentName = sessionAgents.get(input.sessionID) ?? ""
-        const role = agentNameToRole(agentName)
+        // Role comes straight from the hook event (V1 derived it from the
+        // most recent chat.message for the session).
+        const role = agentNameToRole(String(event.agent ?? ""))
 
         // Call the shared script via execFile (non-promisified to avoid stdin deadlock).
         // The script reads JSON from stdin, so we must write to stdin and close it.
@@ -57,6 +58,11 @@ export default (async ({ client, project, directory, $ }) => {
 
         const exitCode = await new Promise<number>((resolve) => {
           const child = execFile(scriptPath, [], {
+            // cwd MUST be the project directory: the script resolves factory.yaml
+            // via `git rev-parse --show-toplevel` in ITS cwd, and the shared
+            // background server runs from an unrelated directory — without this,
+            // test_file_patterns reads as empty and the gate fails open.
+            cwd: directory,
             env: {
               ...process.env,
               FACTORY_AGENT_ROLE: role,
@@ -77,6 +83,9 @@ export default (async ({ client, project, directory, $ }) => {
 
           // Write the JSON payload to the child's stdin and close it.
           // This unblocks the script's `INPUT=$(cat)` line.
+          // Swallow EPIPE: the child may exit (timeout) before reading stdin;
+          // the callback below still resolves fail-open.
+          child.stdin?.on("error", () => {})
           child.stdin?.end(payload)
         })
 
@@ -84,36 +93,53 @@ export default (async ({ client, project, directory, $ }) => {
           throw new Error("DENIED: implementer role cannot edit test files (*_test.go). Generator/evaluator separation.")
         }
       }
-    },
+    })
 
-    "tool.execute.after": async (input, output) => {
-      // PostToolUse: run gofmt on Go files after edit.
-      // Uses execFile (not exec) to prevent command injection.
-      const toolName = input.tool ?? ""
+    // PostToolUse: run gofmt on Go files after edit.
+    // Uses execFile (not exec) to prevent command injection.
+    await ctx.tool.hook("execute.after", async (event) => {
+      const toolName = event.tool
       if (toolName === "edit" || toolName === "write") {
-        const filePath = output?.args?.filePath ?? output?.args?.path ?? input?.args?.filePath ?? ""
+        const raw = typeof event.input === "object" && event.input !== null ? event.input : {}
+        const input = raw as { filePath?: string; path?: string }
+        const filePath = input.filePath ?? input.path ?? ""
         if (/\.go$/.test(filePath)) {
           try {
-            const { promisify } = await import("node:util")
-            const execFileAsync = promisify(execFile)
-            await execFileAsync("gofmt", ["-w", filePath])
+            // cwd: filePath may be relative; resolve against the project directory.
+            await execFileAsync("gofmt", ["-w", filePath], { cwd: directory })
           } catch {
             // Best-effort; non-blocking
           }
         }
       }
-    },
+    })
 
     // Second-brain loop-close nudge: on session.idle, write a flag file
     // that reminds the agent to reflect on whether the previous turn
     // produced a lesson worth writing to memory/lessons/.
     // Per AGENTS.md "Second-brain loop-close" rule + Karpathy pattern.
-    event: async ({ event }) => {
-      if (event.type === "session.idle") {
-        const sessionID = event.properties.sessionID
+    // V1 returned an `event` hook; V2 subscribes to the server event stream.
+    // The stream is server-wide, so an idle event is written only when it
+    // belongs to this plugin's directory: prefer the event's own location;
+    // some session events omit it, so fall back to the session's location
+    // (SessionInfo.location.directory) instead of guessing.
+    const controller = new AbortController()
+    void (async () => {
+      for await (const evt of ctx.event.subscribe({ signal: controller.signal })) {
+        if (evt.type !== "session.idle") continue
+        let eventDir: string | undefined = evt.location?.directory
+        if (!eventDir) {
+          try {
+            const session = await ctx.session.get({ sessionID: evt.data.sessionID })
+            eventDir = session.location?.directory
+          } catch {
+            // Session unknown/unresolvable — skip rather than risk cross-project writes.
+          }
+        }
+        if (eventDir !== directory) continue
         try {
           writeFileSync(flagPath,
-            `sessionID: ${sessionID}\n` +
+            `sessionID: ${evt.data.sessionID}\n` +
             `turn ended: ${new Date().toISOString()}\n\n` +
             `If this turn revealed a non-obvious fact (gotcha, version mismatch,\n` +
             `API shape, bug fix that cost time), write memory/lessons/NNN-*.md\n` +
@@ -124,17 +150,19 @@ export default (async ({ client, project, directory, $ }) => {
           // Best-effort; non-blocking
         }
       }
-    },
+    })().catch(() => {
+      // Stream aborted during plugin unload — expected.
+    })
 
-    // Best-effort loop-close check at process exit.
+    // Best-effort loop-close check at plugin unload (V1 `dispose` hook).
     // Calls the shared script which checks: files changed since startHead
     // but no new lesson files -> writes memory/PENDING-LESSONS.md.
     // Uses execFileSync (synchronous) so it completes before the process exits.
-    // NOT VERIFIED: whether dispose fires on TUI quit (requires live testing).
-    dispose: async () => {
+    return async () => {
+      controller.abort()
       if (!startHead) return
       try {
-        // Delete the per-turn flag file — session is ending, the nudge is stale.
+        // Delete the per-turn flag file — plugin is unloading, the nudge is stale.
         if (existsSync(flagPath)) {
           unlinkSync(flagPath)
         }
@@ -152,9 +180,9 @@ export default (async ({ client, project, directory, $ }) => {
         // Best-effort; non-blocking. The script exits 1 when it writes
         // a reminder (changes exist, no lessons) — that's expected, not an error.
       }
-    },
-  }
-}) satisfies Plugin
+    }
+  },
+})
 
 // agentNameToRole maps an opencode agent name to a FACTORY_AGENT_ROLE value.
 // The mapping is: implementer → "implementer" (denied test edits); all others → "" (allowed).
