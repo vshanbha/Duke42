@@ -128,8 +128,10 @@ statusMessage = "Enforcing implementer test-file boundary"
 EOF
   fi
 
+  chmod 644 "$AGENT_FILE"
   echo "sync-codex: wrote .codex/agents/${AGENT_NAME}.toml"
 done
 
+chmod 644 "$CODEX_DIR/config.toml"
 echo "sync-codex: wrote .codex/config.toml"
 echo "sync-codex: done"
