@@ -1,7 +1,10 @@
 import { Plugin } from "@opencode/plugin"
 import { execFile, execFileSync } from "node:child_process"
+import { promisify } from "node:util"
 import { join } from "node:path"
 import { existsSync, unlinkSync, writeFileSync } from "node:fs"
+
+const execFileAsync = promisify(execFile)
 
 // Duke42 software-factory hooks — OpenCode V2 plugin API.
 // Migrated from the V1 function entrypoint (export default async ({...}) => ({...})),
@@ -35,7 +38,9 @@ export default Plugin.define({
     await ctx.tool.hook("execute.before", async (event) => {
       const toolName = event.tool
       if (toolName === "edit" || toolName === "write") {
-        const input = (event.input ?? {}) as { filePath?: string; path?: string }
+        // event.input is `unknown` in ToolHooks — guard before property access.
+        const raw = typeof event.input === "object" && event.input !== null ? event.input : {}
+        const input = raw as { filePath?: string; path?: string }
         const filePath = input.filePath ?? input.path ?? ""
 
         // Role comes straight from the hook event (V1 derived it from the
@@ -78,6 +83,9 @@ export default Plugin.define({
 
           // Write the JSON payload to the child's stdin and close it.
           // This unblocks the script's `INPUT=$(cat)` line.
+          // Swallow EPIPE: the child may exit (timeout) before reading stdin;
+          // the callback below still resolves fail-open.
+          child.stdin?.on("error", () => {})
           child.stdin?.end(payload)
         })
 
@@ -92,13 +100,12 @@ export default Plugin.define({
     await ctx.tool.hook("execute.after", async (event) => {
       const toolName = event.tool
       if (toolName === "edit" || toolName === "write") {
-        const input = (event.input ?? {}) as { filePath?: string; path?: string }
+        const raw = typeof event.input === "object" && event.input !== null ? event.input : {}
+        const input = raw as { filePath?: string; path?: string }
         const filePath = input.filePath ?? input.path ?? ""
         if (/\.go$/.test(filePath)) {
           try {
-            const { promisify } = await import("node:util")
-            const execFileAsync = promisify(execFile)
-            // cwd: filePath may be relative to the project directory.
+            // cwd: filePath may be relative; resolve against the project directory.
             await execFileAsync("gofmt", ["-w", filePath], { cwd: directory })
           } catch {
             // Best-effort; non-blocking
@@ -112,13 +119,24 @@ export default Plugin.define({
     // produced a lesson worth writing to memory/lessons/.
     // Per AGENTS.md "Second-brain loop-close" rule + Karpathy pattern.
     // V1 returned an `event` hook; V2 subscribes to the server event stream.
-    // The stream is server-wide, so skip idle events from other locations —
-    // this flag file belongs to this plugin's directory only.
+    // The stream is server-wide, so an idle event is written only when it
+    // belongs to this plugin's directory: prefer the event's own location;
+    // some session events omit it, so fall back to the session's location
+    // (SessionInfo.location.directory) instead of guessing.
     const controller = new AbortController()
     void (async () => {
       for await (const evt of ctx.event.subscribe({ signal: controller.signal })) {
         if (evt.type !== "session.idle") continue
-        if (evt.location && evt.location.directory !== directory) continue
+        let eventDir: string | undefined = evt.location?.directory
+        if (!eventDir) {
+          try {
+            const session = await ctx.session.get({ sessionID: evt.data.sessionID })
+            eventDir = session.location?.directory
+          } catch {
+            // Session unknown/unresolvable — skip rather than risk cross-project writes.
+          }
+        }
+        if (eventDir !== directory) continue
         try {
           writeFileSync(flagPath,
             `sessionID: ${evt.data.sessionID}\n` +

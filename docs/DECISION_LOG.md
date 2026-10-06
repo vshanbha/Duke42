@@ -193,7 +193,12 @@ export), leaving the in-session test-edit gate inactive. Decisions:
 - **Remove the `plugin` key from `opencode.json` entirely.** V2 auto-discovers
   `.opencode/plugin/`; a config entry with a relative spec is treated as an
   npm package (the reported failure) and would be redundant with discovery.
-  Verified: single clean load, `state.status=active` via `GET /api/plugin`.
+  Documented in the V2 migration guide
+  (<https://opencode.ai/v2/docs/build/plugins/migrate-v1>): "V2 discovers local
+  plugins from both `.opencode/plugin/` and `.opencode/plugins/`". Verified live:
+  after removing the key, one clean load in `opencode.log` (10:50:09Z, no WARN)
+  and `GET /api/plugin` returned `factory-hooks` with
+  `source.path=<project>/.opencode/plugin/factory-hooks.ts`, `status=active`.
 - **Dependency swap**: `.opencode/package.json` now depends on
   `@opencode/plugin@2.0.23` (runtime-matched) instead of the V1
   `@opencode-ai/plugin@1.17.13`, so `Plugin.define` type-checks against V2.
