@@ -23,12 +23,14 @@ in `~/.local/share/opencode/log/opencode.log` (run 722aa801) and the worklog.
    workaround is unnecessary (verified from `@opencode/plugin@2.0.23` types,
    `dist/promise/tool.d.ts`).
 3. **Do not declare local file plugins in config unless needed.** V2
-   auto-discovers `.opencode/plugin/` and `.opencode/plugins/`. A config entry
-   with the V1 `plugin` key and raw relative spec
-   (`.opencode/plugin/factory-hooks.ts`) was routed to the npm-package
+   auto-discovers `.opencode/plugin/` and `.opencode/plugins/` (migration guide:
+   <https://opencode.ai/v2/docs/build/plugins/migrate-v1> — "V2 discovers local
+   plugins from both"). A config entry with the V1 `plugin` key and raw relative
+   spec (`.opencode/plugin/factory-hooks.ts`) was routed to the npm-package
    installer: `NpmInstallFailedError ... /Users/shanb/.opencode/.../package.json`
    ENOENT (err_aca758e7). Removing the key eliminated the error; verified one
-   clean load + `state.status=active` via `opencode api get /api/plugin`.
+   clean load + `state.status=active` via `opencode api get /api/plugin`
+   (`source.path` = the singular-directory file).
 4. **Hook scripts must be spawned with an explicit `cwd` — the shared server
    does not run from the project directory.** `scripts/lib/config.sh` resolves
    factory.yaml via `git rev-parse --show-toplevel` **in the script's cwd**;
