@@ -212,3 +212,30 @@ export), leaving the in-session test-edit gate inactive. Decisions:
 Consequence: the existing parity-stale gate (diff-aware-check →
 pending-lessons-push-block) remains the enforcement for any future
 factory-hooks change; session 10 worklog and lesson 003 carry the evidence.
+
+## Decision 11 — Maven pack reconciliation: local Decision 2 overrides kept (2026-10-06)
+
+Template v0.1.6 ships native Maven support (`packs/java/maven/MAVEN.md`,
+`quality-maven.xml`, `maven_check_command`). Duke42 was the first real Maven
+adopter (upstream issue #66); the pack's beta maturity is attributed to this
+repo's adoption. Evaluated the upstream flow against our local Decision 2
+overrides and decided to keep the local overrides:
+
+- **check_command stays exclusion-based.** Upstream `maven_check_command` is
+  `mvn -B verify && ./scripts/hooks/junit5-only-check.sh`. `verify` runs the
+  failsafe `E2EIT` suite, which needs a locally pulled LLM model — the same
+  non-determinism Decision 2 excluded. Our command
+  (`mvn -q test '-Dtest=!ChatClientIntegrationTest,!E2EIT' -Dsurefire.failIfNoSpecifiedTests=false`)
+  remains the deterministic offline gate. The upstream Surefire-selection-trap
+  warning (exclusion-only `-Dtest` can pull failsafe classes into surefire)
+  is exactly why `!E2EIT` is pinned in our command.
+- **Quality plugins stay unwired.** `quality-maven.xml` (Spotless 3.10.2,
+  Error Prone 2.50.0, SpotBugs, PIT) is not merged into the parent POM — same
+  deferral as Decision 2's Gradle `quality.gradle` deletion. Revisit when the
+  pom quality plugins land; the upstream snippet is now the reference.
+- **No `java-pack.yml` workflow.** Same reasoning as Decision 2: shipping a
+  red-on-arrival CI workflow is worse than deferring it.
+
+Consequence: `factory.yaml` is unchanged by the v0.1.6 upgrade; Decision 2
+stands as written. The upstream Maven assets are the reference for the future
+wiring, not a behavior change today.
