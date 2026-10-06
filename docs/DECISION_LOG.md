@@ -175,3 +175,40 @@ with the backend module.
 `SandboxedGlobTool` and `SandboxedGrepTool` enforce `allowedDirectory` restrictions on path arguments. Initially used `Path.of(path).toAbsolutePath().normalize().startsWith(allowedDirectory)` which did not resolve symlinks — a symlink inside `allowedDirectory` pointing outside would pass the check.
 
 **Fix applied:** `isWithinAllowedDirectory` now uses `toRealPath()` when the path exists (resolves symlinks), falling back to `toAbsolutePath().normalize()` for non-existent paths. Both the `target` and `allowedDirectory` are resolved for consistent comparison. Symlink escape tests added to `GlobToolTest` and `GrepToolTest`.
+
+## Decision 10 — factory-hooks adopts the OpenCode V2 plugin API; config-declared plugin entry dropped (2026-10-06)
+
+OpenCode upgraded to V2.0.23, which rejects V1 plugin implementations
+("V1 plugin implementations do not run in V2"). The factory-hooks plugin
+failed to load (`err_aca758e7`: the raw relative spec in the V1 `plugin` key
+routed to the npm installer and hit ENOENT on a nonexistent `package.json`;
+sibling `SchemaError(Expected object at ["default"])` for the function
+export), leaving the in-session test-edit gate inactive. Decisions:
+
+- **Port `.opencode/plugin/factory-hooks.ts` to the V2 API**:
+  `Plugin.define({ id: "factory-hooks", setup })`, hooks registered on their
+  domains (`ctx.tool.hook`, `ctx.event.subscribe`), cleanup returned by
+  `setup`. The V1 `chat.message` session→agent map was dropped — V2 tool hook
+  events carry `agent` directly.
+- **Remove the `plugin` key from `opencode.json` entirely.** V2 auto-discovers
+  `.opencode/plugin/`; a config entry with a relative spec is treated as an
+  npm package (the reported failure) and would be redundant with discovery.
+  Documented in the V2 migration guide
+  (<https://opencode.ai/v2/docs/build/plugins/migrate-v1>): "V2 discovers local
+  plugins from both `.opencode/plugin/` and `.opencode/plugins/`". Verified live:
+  after removing the key, one clean load in `opencode.log` (10:50:09Z, no WARN)
+  and `GET /api/plugin` returned `factory-hooks` with
+  `source.path=<project>/.opencode/plugin/factory-hooks.ts`, `status=active`.
+- **Dependency swap**: `.opencode/package.json` now depends on
+  `@opencode/plugin@2.0.23` (runtime-matched) instead of the V1
+  `@opencode-ai/plugin@1.17.13`, so `Plugin.define` type-checks against V2.
+- **Hook scripts are spawned with `cwd: directory`.** `scripts/lib/config.sh`
+  resolves factory.yaml via `git rev-parse --show-toplevel` in the script's
+  cwd; the shared background server runs from an unrelated directory, so
+  without an explicit cwd `test_file_patterns` read empty and test-edit denial
+  failed open. Found by live parity eval (pre-fix write succeeded; post-fix
+  output `Error: DENIED: implementer role cannot edit test files`).
+
+Consequence: the existing parity-stale gate (diff-aware-check →
+pending-lessons-push-block) remains the enforcement for any future
+factory-hooks change; session 10 worklog and lesson 003 carry the evidence.

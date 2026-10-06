@@ -93,9 +93,6 @@
       "env": {}
     }
   },
-  "plugin": [
-    ".opencode/plugin/factory-hooks.ts"
-  ],
   "model": "opencode-go/ox-alpha-free",
   "small_model": "opencode-go/ox-alpha-free"
 }
